@@ -48,7 +48,7 @@ static void destructor(lv_fragment_t *self) {
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     settings_fragment *fragment = (settings_fragment *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    lv_win_add_title(win, "Settings");
+    lv_win_add_title(win, "Настройки");
     app_lv_win_add_close_btn(win, fragment->app);
     fragment->content = lv_win_get_content(win);
     return win;

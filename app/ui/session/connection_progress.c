@@ -36,12 +36,12 @@ lv_obj_t *create_obj_cb(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_text_font(title, lv_theme_get_font_large(content), 0);
     lv_obj_set_grid_cell(title, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_START, 0, 1);
     lv_obj_set_style_pad_top(title, LV_DPX(20), 0);
-    lv_label_set_text_static(title, "Connecting");
+    lv_label_set_text_static(title, "Подключение");
 
     lv_obj_t *subtitle = lv_label_create(content);
     lv_obj_set_style_pad_top(subtitle, LV_DPX(15), 0);
     lv_obj_set_grid_cell(subtitle, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_START, 1, 1);
-    lv_label_set_text_fmt(subtitle, "Setting up streaming for %s...", session_fragment_get_host_name(session_fragment));
+    lv_label_set_text_fmt(subtitle, "Настройка стрима для %s…", session_fragment_get_host_name(session_fragment));
 
     lv_obj_t *spinner = lv_spinner_create(content, 1000, 60);
     lv_obj_set_style_arc_width(spinner, LV_DPX(10), 0);

@@ -76,7 +76,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_border_width(obj, 0, 0);
 
     lv_obj_t *hint = lv_label_create(obj);
-    lv_label_set_text(hint, "Enter the PIN shown on your Steam PC");
+    lv_label_set_text(hint, "Введите PIN с экрана Steam на ПК");
     lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
 
     fragment->pin_label = lv_label_create(obj);
@@ -117,7 +117,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->delete_btn = lv_btn_create(actions);
     lv_obj_t *backspace_label = lv_label_create(fragment->delete_btn);
-    lv_label_set_text(backspace_label, "Delete");
+    lv_label_set_text(backspace_label, "Стереть");
     lv_obj_center(backspace_label);
     lv_obj_add_event_cb(fragment->delete_btn, backspace_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->delete_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -125,7 +125,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->submit_btn = lv_btn_create(actions);
     lv_obj_t *submit_label = lv_label_create(fragment->submit_btn);
-    lv_label_set_text(submit_label, "Connect");
+    lv_label_set_text(submit_label, "Подключить");
     lv_obj_center(submit_label);
     lv_obj_add_event_cb(fragment->submit_btn, submit_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->submit_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -133,7 +133,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->cancel_btn = lv_btn_create(actions);
     lv_obj_t *cancel_label = lv_label_create(fragment->cancel_btn);
-    lv_label_set_text(cancel_label, "Cancel");
+    lv_label_set_text(cancel_label, "Отмена");
     lv_obj_center(cancel_label);
     lv_obj_add_event_cb(fragment->cancel_btn, cancel_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->cancel_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -173,7 +173,7 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     (void) obj;
     stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
     lv_fragment_t *parent = lv_fragment_get_parent(self);
-    connection_fragment_set_title(parent, "Streaming PIN");
+    connection_fragment_set_title(parent, "PIN для стрима");
     app_ui_push_modal_group(fragment->app->ui, fragment->group);
     lv_group_focus_obj(fragment->digit_btns[0]);
 }

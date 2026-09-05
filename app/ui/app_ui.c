@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <lvgl.h>
 #include <src/draw/sdl/lv_draw_sdl.h>
@@ -37,7 +38,12 @@ app_ui_t *app_ui_create(app_t *app, lv_disp_t *disp) {
     app_ui_fontset_set_default_size(ui, &ui->font);
     app_ui_fontset_set_default_size(ui, &ui->iconfont);
 
-    app_ui_fontset_init_fc(&ui->font, "sans-serif");
+    /* Bundled DejaVu for Cyrillic UI on webOS; fall back to system sans-serif. */
+    if (access("fonts/UIFont.ttf", R_OK) == 0) {
+        app_ui_fontset_init_file(&ui->font, "fonts/UIFont.ttf");
+    } else {
+        app_ui_fontset_init_fc(&ui->font, "sans-serif");
+    }
     app_ui_fontset_init_mem(&ui->iconfont, "bootstrap-icons", ttf_bootstrap_icons_data,
                             ttf_bootstrap_icons_size);
     app_ui_fontset_apply_fallback(&ui->font, &ui->iconfont);

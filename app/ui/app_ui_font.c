@@ -28,6 +28,16 @@ void app_ui_fontset_init_mem(app_ui_fontset_t *set, const char *name, const void
     set->huge = load_font(&ft_info, set->sizes.huge);
 }
 
+void app_ui_fontset_init_file(app_ui_fontset_t *set, const char *path) {
+    lv_ft_info_t ft_info = {.name = path, .style = FT_FONT_STYLE_NORMAL};
+    set->body = load_font(&ft_info, set->sizes.body);
+    set->heading1 = load_font(&ft_info, set->sizes.heading1);
+    set->heading2 = load_font(&ft_info, set->sizes.heading2);
+    set->heading3 = load_font(&ft_info, set->sizes.heading3);
+    set->small = load_font(&ft_info, set->sizes.small);
+    set->huge = load_font(&ft_info, set->sizes.huge);
+}
+
 void app_ui_fontset_init_fc(app_ui_fontset_t *set, const char *name) {
     //does not necessarily have to be a specific name.  You could put anything here and Fontconfig WILL find a font for you
     FcPattern *pattern = FcNameParse((const FcChar8 *) name);

@@ -153,7 +153,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_pad_gap(overlay_hint, LV_DPX(15), 0);
 
     lv_obj_t *overlay_label = lv_label_create(overlay_hint);
-    lv_label_set_text_static(overlay_label, "Long press to open the menu");
+    lv_label_set_text_static(overlay_label, "Удерживайте, чтобы открыть меню");
 
     lv_obj_t *overlay_progress = lv_arc_create(overlay_hint);
     lv_obj_set_size(overlay_progress, LV_DPX(30), LV_DPX(30));
@@ -248,7 +248,7 @@ static void session_disconnected_main(const IHS_SessionInfo *info, bool requeste
 //    SDL_SetCursor(SDL_GetDefaultCursor());
     if (!requested) {
         static const char *btn_txts[] = {"OK", ""};
-        lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, "Disconnected.", btn_txts, false);
+        lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, "Отключено.", btn_txts, false);
         lv_obj_add_event_cb(mbox, disconnected_dialog_cb, LV_EVENT_VALUE_CHANGED, NULL);
         lv_obj_center(mbox);
     }

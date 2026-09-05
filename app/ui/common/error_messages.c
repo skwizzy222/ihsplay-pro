@@ -3,55 +3,55 @@
 const char *authorization_result_str(IHS_AuthorizationResult result) {
     switch (result) {
         case IHS_AuthorizationDenied:
-            return "Host denied authorization";
+            return "Хост отклонил авторизацию";
         case IHS_AuthorizationNotLoggedIn:
-            return "Steam is not logged in on the host";
+            return "Steam не выполнен вход на хосте";
         case IHS_AuthorizationOffline:
-            return "Host is offline";
+            return "Хост не в сети";
         case IHS_AuthorizationBusy:
-            return "Host is busy — try again in a moment";
+            return "Хост занят — попробуйте чуть позже";
         case IHS_AuthorizationTimedOut:
-            return "Authorization timed out";
+            return "Время авторизации истекло";
         case IHS_AuthorizationCanceled:
-            return "Authorization cancelled";
+            return "Авторизация отменена";
         case IHS_AuthorizationFailed:
-            return "Authorization failed";
+            return "Ошибка авторизации";
         default:
-            return "Unknown authorization error";
+            return "Неизвестная ошибка авторизации";
     }
 }
 
 const char *streaming_result_str(IHS_StreamingResult result) {
     switch (result) {
         case IHS_StreamingUnauthorized:
-            return "Device is not authorized — pairing required";
+            return "Устройство не авторизовано — нужна привязка";
         case IHS_StreamingScreenLocked:
-            return "Host screen is locked — unlock it and retry";
+            return "Экран хоста заблокирован — разблокируйте и повторите";
         case IHS_StreamingFailed:
-            return "Streaming failed on the host";
+            return "Стрим не удалось запустить на хосте";
         case IHS_StreamingBusy:
-            return "Host is busy with another stream";
+            return "Хост занят другим стримом";
         case IHS_StreamingCanceled:
-            return "Connection cancelled";
+            return "Подключение отменено";
         case IHS_StreamingDriversNotInstalled:
-            return "Streaming drivers are missing on the host";
+            return "На хосте не установлены драйверы стрима";
         case IHS_StreamingDisabled:
-            return "Remote Play is disabled in Steam settings";
+            return "Remote Play отключён в настройках Steam";
         case IHS_StreamingBroadcastingActive:
-            return "Broadcasting is already active on the host";
+            return "На хосте уже идёт трансляция";
         case IHS_StreamingVRActive:
-            return "VR session is active on the host";
+            return "На хосте активна VR-сессия";
         case IHS_StreamingPINRequired:
-            return "Streaming PIN required";
+            return "Требуется PIN для стрима";
         case IHS_StreamingTransportUnavailable:
-            return "Network transport unavailable";
+            return "Сетевой транспорт недоступен";
         case IHS_StreamingInvisible:
-            return "Host is not visible for Remote Play";
+            return "Хост не виден для Remote Play";
         case IHS_StreamingGameLaunchFailed:
-            return "Host failed to launch the game";
+            return "Хост не смог запустить игру";
         case IHS_StreamingTimeout:
-            return "No response from host — check network / firewall";
+            return "Нет ответа от хоста — проверьте сеть / firewall";
         default:
-            return "Unknown streaming error";
+            return "Неизвестная ошибка стрима";
     }
 }

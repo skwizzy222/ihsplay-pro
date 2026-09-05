@@ -48,12 +48,12 @@ static lv_obj_t *pin_create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_label_set_text(pin_label, fragment->pin);
 
     lv_obj_t *hint1 = lv_label_create(obj);
-    lv_label_set_text(hint1, "Enter this PIN on your Steam PC to pair this TV");
+    lv_label_set_text(hint1, "Введите этот PIN на компьютере со Steam, чтобы привязать телевизор");
     lv_obj_set_style_text_align(hint1, LV_TEXT_ALIGN_CENTER, 0);
 
     lv_obj_t *cancel = lv_btn_create(obj);
     lv_obj_t *cancel_label = lv_label_create(cancel);
-    lv_label_set_text(cancel_label, "Cancel pairing");
+    lv_label_set_text(cancel_label, "Отменить привязку");
     lv_obj_center(cancel_label);
     lv_obj_add_event_cb(cancel, cancel_clicked, LV_EVENT_CLICKED, fragment);
 
@@ -63,7 +63,7 @@ static lv_obj_t *pin_create_obj(lv_fragment_t *self, lv_obj_t *container) {
 static void pin_obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     (void) obj;
     lv_fragment_t *parent = lv_fragment_get_parent(self);
-    connection_fragment_set_title(parent, "Pairing");
+    connection_fragment_set_title(parent, "Привязка");
 }
 
 static void cancel_clicked(lv_event_t *e) {

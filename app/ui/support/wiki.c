@@ -16,7 +16,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *parent) {
     lv_obj_set_size(hint, LV_PCT(100), LV_SIZE_CONTENT);
     const char *url = "https://github.com/mariotaku/ihsplay/wiki";
 
-    lv_label_set_text_fmt(hint, "Open %s for guides and frequently asked questions. Or scan the QR code below.", url);
+    lv_label_set_text_fmt(hint, "Откройте %s для инструкций и FAQ. Или отсканируйте QR-код ниже.", url);
 
     lv_obj_t *qrcode = lv_qrcode_create(content, LV_DPX(200), lv_color_black(), lv_color_white());
     lv_obj_set_style_bg_opa(qrcode, LV_OPA_COVER, 0);

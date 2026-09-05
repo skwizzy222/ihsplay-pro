@@ -77,7 +77,7 @@ static void conn_ctor(lv_fragment_t *self, void *arg) {
 static lv_obj_t *conn_create_obj(lv_fragment_t *self, lv_obj_t *container) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    fragment->title = lv_win_add_title(win, "Connecting");
+    fragment->title = lv_win_add_title(win, "Подключение");
     fragment->cancel_btn = app_lv_win_add_close_btn(win, fragment->app);
     /* Close must cancel pairing/stream request, not only pop UI. */
     lv_obj_remove_event_cb(fragment->cancel_btn, NULL);
@@ -91,7 +91,7 @@ static void conn_obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     host_manager_t *hosts_manager = fragment->app->host_manager;
     host_manager_register_listener(hosts_manager, &conn_host_listener, fragment);
-    connection_fragment_set_title(self, "Connecting");
+    connection_fragment_set_title(self, "Подключение");
     host_manager_session_request(hosts_manager, &fragment->host);
 }
 
@@ -112,7 +112,7 @@ void connection_fragment_set_title(lv_fragment_t *self, const char *title) {
 void connection_fragment_submit_stream_pin(lv_fragment_t *self, const char *pin) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     fragment->awaiting_stream_pin = false;
-    connection_fragment_set_title(self, "Connecting");
+    connection_fragment_set_title(self, "Подключение");
     host_manager_session_request_with_pin(fragment->app->host_manager, &fragment->host, pin);
 }
 
@@ -153,7 +153,7 @@ static void authorized(const IHS_HostInfo *host, uint64_t steam_id, void *contex
     (void) host;
     (void) steam_id;
     connection_fragment_t *fragment = (connection_fragment_t *) context;
-    connection_fragment_set_title((lv_fragment_t *) fragment, "Connecting");
+    connection_fragment_set_title((lv_fragment_t *) fragment, "Подключение");
     host_manager_t *hosts_manager = fragment->app->host_manager;
     host_manager_session_request(hosts_manager, &fragment->host);
 }

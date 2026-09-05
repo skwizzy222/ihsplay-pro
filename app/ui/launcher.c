@@ -198,7 +198,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_t *brand_sub = lv_label_create(header);
     lv_obj_add_style(brand_sub, &fragment->styles.subtitle, 0);
     lv_obj_set_style_pad_left(brand_sub, LV_DPX(8), 0);
-    lv_label_set_text(brand_sub, "Remote Play");
+    lv_label_set_text(brand_sub, "Удалённая игра");
 
     lv_obj_t *spacer = lv_obj_create(header);
     lv_obj_remove_style_all(spacer);
@@ -259,10 +259,10 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_t *label_play = lv_label_create(btn_play);
     lv_obj_set_style_text_font(label_play, fragment->app->ui->font.heading3, 0);
     lv_obj_set_style_text_color(label_play, lv_color_white(), 0);
-    lv_label_set_text(label_play, "PLAY");
+    lv_label_set_text(label_play, "ИГРАТЬ");
     lv_obj_t *label_play_sub = lv_label_create(btn_play);
     lv_obj_set_style_text_color(label_play_sub, lv_color_hex(0xd2e885), 0);
-    lv_label_set_text(label_play_sub, "Start Remote Play");
+    lv_label_set_text(label_play_sub, "Запустить Remote Play");
 
     lv_obj_add_event_cb(btn_play, request_session, LV_EVENT_CLICKED, fragment);
 
@@ -271,7 +271,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_add_event_cb(selected_host, select_host, LV_EVENT_CLICKED, fragment);
 
-    lv_obj_t *add_host = launch_option_create_label_action(fragment, BS_SYMBOL_WINDOW_DESKTOP, "Add a computer…");
+    lv_obj_t *add_host = launch_option_create_label_action(fragment, BS_SYMBOL_WINDOW_DESKTOP, "Добавить компьютер…");
     fragment->add_host = add_host;
     lv_obj_add_event_cb(add_host, add_host_clicked, LV_EVENT_CLICKED, fragment);
 
@@ -344,11 +344,11 @@ static void launcher_gamepads_changed(launcher_fragment *fragment) {
     size_t count = input_manager_sdl_gamepad_count(manager);
     lv_obj_t *label = launch_option_get_label(fragment->gamepads);
     if (count == 0) {
-        lv_label_set_text(label, "No gamepad connected");
+        lv_label_set_text(label, "Геймпад не подключён");
     } else if (count == 1) {
-        lv_label_set_text(label, "1 gamepad connected");
+        lv_label_set_text(label, "Подключён 1 геймпад");
     } else {
-        lv_label_set_text_fmt(label, "%u gamepads connected", count);
+        lv_label_set_text_fmt(label, "Геймпадов: %u", (unsigned) count);
     }
 }
 
@@ -446,7 +446,7 @@ static void hosts_update(launcher_fragment *fragment) {
     if (host != NULL) {
         launch_option_set_text(fragment->selected_host, host->hostname);
     } else {
-        launch_option_set_text(fragment->selected_host, "Choose a computer…");
+        launch_option_set_text(fragment->selected_host, "Выберите компьютер…");
     }
 }
 

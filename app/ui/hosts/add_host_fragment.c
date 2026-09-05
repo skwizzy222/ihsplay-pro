@@ -95,7 +95,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_pad_gap(content, LV_DPX(14), 0);
 
     lv_obj_t *hint = lv_label_create(content);
-    lv_label_set_text(hint, "Enter the local IP of your Steam PC");
+    lv_label_set_text(hint, "Введите локальный IP компьютера со Steam");
     lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
 
     fragment->ip_label = lv_label_create(content);
@@ -134,7 +134,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->delete_btn = lv_btn_create(actions);
     lv_obj_t *backspace_label = lv_label_create(fragment->delete_btn);
-    lv_label_set_text(backspace_label, "Delete");
+    lv_label_set_text(backspace_label, "Стереть");
     lv_obj_center(backspace_label);
     lv_obj_add_event_cb(fragment->delete_btn, backspace_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->delete_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -142,7 +142,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->find_btn = lv_btn_create(actions);
     lv_obj_t *connect_label = lv_label_create(fragment->find_btn);
-    lv_label_set_text(connect_label, "Find PC");
+    lv_label_set_text(connect_label, "Найти ПК");
     lv_obj_center(connect_label);
     lv_obj_add_event_cb(fragment->find_btn, connect_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->find_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -150,7 +150,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->back_btn = lv_btn_create(actions);
     lv_obj_t *back_label = lv_label_create(fragment->back_btn);
-    lv_label_set_text(back_label, "Close");
+    lv_label_set_text(back_label, "Закрыть");
     lv_obj_center(back_label);
     lv_obj_add_event_cb(fragment->back_btn, nav_back_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->back_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -279,10 +279,10 @@ static void backspace_clicked(lv_event_t *e) {
 static void connect_clicked(lv_event_t *e) {
     add_host_fragment_t *fragment = lv_event_get_user_data(e);
     if (!host_manager_discover_at(fragment->app->host_manager, fragment->ip)) {
-        lv_label_set_text(fragment->status_label, "Invalid IP address");
+        lv_label_set_text(fragment->status_label, "Неверный IP-адрес");
         return;
     }
-    lv_label_set_text(fragment->status_label, "Looking for Steam PC…");
+    lv_label_set_text(fragment->status_label, "Ищем компьютер со Steam…");
     app_ui_pop_top_fragment(fragment->app->ui);
 }
 

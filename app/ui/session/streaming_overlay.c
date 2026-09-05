@@ -78,11 +78,11 @@ static lv_obj_t *create_obj_cb(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *title = lv_label_create(panel);
-    lv_label_set_text(title, "Menu");
+    lv_label_set_text(title, "Меню");
     lv_obj_set_style_text_font(title, fragment->app->ui->font.heading2, 0);
 
     lv_obj_t *hint = lv_label_create(panel);
-    lv_label_set_text(hint, "Back = resume   |   choose an action");
+    lv_label_set_text(hint, "Назад = продолжить   |   выберите действие");
     lv_obj_set_style_text_opa(hint, LV_OPA_70, 0);
 
     fragment->group = lv_group_create();
@@ -92,7 +92,7 @@ static lv_obj_t *create_obj_cb(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_width(fragment->btn_resume, LV_PCT(100));
     lv_obj_set_height(fragment->btn_resume, LV_DPX(56));
     lv_obj_t *resume_label = lv_label_create(fragment->btn_resume);
-    lv_label_set_text(resume_label, "Resume stream");
+    lv_label_set_text(resume_label, "Продолжить стрим");
     lv_obj_center(resume_label);
     lv_obj_add_event_cb(fragment->btn_resume, resume_clicked_cb, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->btn_resume, overlay_key, LV_EVENT_KEY, fragment);
@@ -103,7 +103,7 @@ static lv_obj_t *create_obj_cb(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_height(fragment->btn_quit, LV_DPX(56));
     lv_obj_set_style_bg_color(fragment->btn_quit, lv_color_hex(0xc23b22), 0);
     lv_obj_t *quit_label = lv_label_create(fragment->btn_quit);
-    lv_label_set_text(quit_label, "Disconnect");
+    lv_label_set_text(quit_label, "Отключиться");
     lv_obj_center(quit_label);
     lv_obj_add_event_cb(fragment->btn_quit, quit_clicked_cb, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->btn_quit, overlay_key, LV_EVENT_KEY, fragment);
