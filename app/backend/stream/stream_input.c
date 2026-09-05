@@ -16,7 +16,10 @@ bool stream_input_handle_key_event(stream_manager_t *manager, const SDL_Keyboard
             return true;
         }
         case SDL_SCANCODE_WEBOS_BACK: {
-            // TODO: Send ESC key
+            /* Remote Back = open in-stream menu (same as ESC / Exit). */
+            if (event->state == SDL_RELEASED) {
+                stream_manager_set_overlay_opened(manager, true);
+            }
             return true;
         }
     }

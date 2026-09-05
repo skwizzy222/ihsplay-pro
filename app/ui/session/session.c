@@ -218,9 +218,10 @@ static bool event_cb(lv_fragment_t *self, int code, void *userdata) {
             stream_manager_t *stream_manager = fragment->app->stream_manager;
             if (stream_manager_is_overlay_opened(stream_manager)) {
                 stream_manager_set_overlay_opened(stream_manager, false);
-                return true;
+            } else {
+                stream_manager_set_overlay_opened(stream_manager, true);
             }
-            return false;
+            return true;
         }
         case APP_UI_NAV_QUIT: {
             return true;

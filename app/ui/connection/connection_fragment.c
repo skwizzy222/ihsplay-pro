@@ -47,11 +47,14 @@ static void conn_show_page(connection_fragment_t *fragment, const lv_fragment_cl
 
 static void cancel_clicked(lv_event_t *e);
 
+static bool conn_event_cb(lv_fragment_t *self, int code, void *data);
+
 const lv_fragment_class_t connection_fragment_class = {
         .constructor_cb = conn_ctor,
         .create_obj_cb = conn_create_obj,
         .obj_created_cb = conn_obj_created,
         .obj_will_delete_cb = conn_obj_will_del,
+        .event_cb = conn_event_cb,
         .instance_size = sizeof(connection_fragment_t)
 };
 
@@ -181,6 +184,15 @@ static void open_stream_pin(connection_fragment_t *fragment) {
 static void cancel_clicked(lv_event_t *e) {
     connection_fragment_t *fragment = lv_event_get_user_data(e);
     connection_fragment_cancel((lv_fragment_t *) fragment);
+}
+
+static bool conn_event_cb(lv_fragment_t *self, int code, void *data) {
+    (void) data;
+    if (code == APP_UI_NAV_BACK) {
+        connection_fragment_cancel(self);
+        return true;
+    }
+    return false;
 }
 
 static void conn_show_page(connection_fragment_t *fragment, const lv_fragment_class_t *cls, void *data) {
