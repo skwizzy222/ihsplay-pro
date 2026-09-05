@@ -138,6 +138,13 @@ static int audio_start(IHS_Session *session, const IHS_StreamAudioConfig *config
     }
     stream_media_session_t *media_session = (stream_media_session_t *) context;
     SDL_LockMutex(media_session->lock);
+    if (media_session->opus_decoder != NULL) {
+        opus_multistream_decoder_destroy(media_session->opus_decoder);
+        media_session->opus_decoder = NULL;
+    }
+    free(media_session->pcm_buffer);
+    media_session->pcm_buffer = NULL;
+
     int rc;
     unsigned char mapping[2] = {0, 1};
     const int samples_per_frame = 240;
@@ -155,8 +162,8 @@ static int audio_start(IHS_Session *session, const IHS_StreamAudioConfig *config
             .appName = "IHSplay",
             .streamName = "Streaming",
     };
-    SDL_UnlockMutex(media_session->lock);
     int audio_rc = SS4S_PlayerAudioOpen(media_session->player, &info);
+    SDL_UnlockMutex(media_session->lock);
     if (audio_rc != 0) {
         commons_log_error("Media", "Failed to open audio output: %d", audio_rc);
     }
@@ -166,6 +173,7 @@ static int audio_start(IHS_Session *session, const IHS_StreamAudioConfig *config
 static void audio_stop(IHS_Session *session, void *context) {
     (void) session;
     stream_media_session_t *media_session = (stream_media_session_t *) context;
+    SDL_LockMutex(media_session->lock);
     SS4S_PlayerAudioClose(media_session->player);
     if (media_session->opus_decoder != NULL) {
         opus_multistream_decoder_destroy(media_session->opus_decoder);
@@ -173,15 +181,23 @@ static void audio_stop(IHS_Session *session, void *context) {
     }
     free(media_session->pcm_buffer);
     media_session->pcm_buffer = NULL;
+    SDL_UnlockMutex(media_session->lock);
 }
 
 static int audio_submit(IHS_Session *session, IHS_Buffer *data, void *context) {
     (void) session;
     stream_media_session_t *media_session = (stream_media_session_t *) context;
+    SDL_LockMutex(media_session->lock);
+    if (media_session->opus_decoder == NULL || media_session->pcm_buffer == NULL) {
+        SDL_UnlockMutex(media_session->lock);
+        return -1;
+    }
     int decode_len = opus_multistream_decode(media_session->opus_decoder, data->data + data->offset, data->size,
                                              media_session->pcm_buffer, media_session->pcm_buffer_size, 0);
-    return SS4S_PlayerAudioFeed(media_session->player, (const unsigned char *) media_session->pcm_buffer,
-                                media_session->pcm_unit_size * decode_len);
+    int feed_rc = SS4S_PlayerAudioFeed(media_session->player, (const unsigned char *) media_session->pcm_buffer,
+                                       media_session->pcm_unit_size * decode_len);
+    SDL_UnlockMutex(media_session->lock);
+    return feed_rc;
 }
 
 static int video_start(IHS_Session *session, const IHS_StreamVideoConfig *config, void *context) {
@@ -218,7 +234,9 @@ static int video_start(IHS_Session *session, const IHS_StreamVideoConfig *config
 static void video_stop(IHS_Session *session, void *context) {
     (void) session;
     stream_media_session_t *media_session = (stream_media_session_t *) context;
+    SDL_LockMutex(media_session->lock);
     SS4S_PlayerVideoClose(media_session->player);
+    SDL_UnlockMutex(media_session->lock);
 }
 
 static IHS_StreamVideoSubmitResult video_submit(IHS_Session *session, IHS_Buffer *data, IHS_StreamVideoFrameFlag flags,
