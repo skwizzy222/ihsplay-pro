@@ -17,6 +17,7 @@ typedef struct connection_fragment_t {
     lv_fragment_t base;
     app_t *app;
     IHS_HostInfo host;
+    IHS_StreamInterface stream_interface;
     lv_obj_t *content;
     lv_obj_t *title;
     lv_obj_t *cancel_btn;
@@ -69,9 +70,11 @@ static void conn_ctor(lv_fragment_t *self, void *arg) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     app_ui_fragment_args_t *args = arg;
     fragment->app = args->app;
-    fragment->host = (*(IHS_HostInfo *) args->data);
+    connection_launch_args_t *launch = args->data;
+    fragment->host = launch->host;
+    fragment->stream_interface = launch->stream_interface;
     fragment->awaiting_stream_pin = false;
-    free(args->data);
+    free(launch);
 }
 
 static lv_obj_t *conn_create_obj(lv_fragment_t *self, lv_obj_t *container) {
@@ -92,7 +95,7 @@ static void conn_obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     host_manager_t *hosts_manager = fragment->app->host_manager;
     host_manager_register_listener(hosts_manager, &conn_host_listener, fragment);
     connection_fragment_set_title(self, "Подключение");
-    host_manager_session_request(hosts_manager, &fragment->host);
+    host_manager_session_request_ex(hosts_manager, &fragment->host, fragment->stream_interface);
 }
 
 static void conn_obj_will_del(lv_fragment_t *self, lv_obj_t *obj) {
@@ -155,7 +158,7 @@ static void authorized(const IHS_HostInfo *host, uint64_t steam_id, void *contex
     connection_fragment_t *fragment = (connection_fragment_t *) context;
     connection_fragment_set_title((lv_fragment_t *) fragment, "Подключение");
     host_manager_t *hosts_manager = fragment->app->host_manager;
-    host_manager_session_request(hosts_manager, &fragment->host);
+    host_manager_session_request_ex(hosts_manager, &fragment->host, fragment->stream_interface);
 }
 
 static void authorization_failed(const IHS_HostInfo *host, IHS_AuthorizationResult result, void *context) {

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include "app.h"
 #include "app_ui.h"
 #include "config.h"
@@ -30,10 +31,14 @@ typedef struct launcher_fragment {
         lv_style_t play_btn;
         lv_style_t play_btn_focused;
         lv_style_t play_btn_pressed;
+        lv_style_t play_btn_hydra;
+        lv_style_t play_btn_hydra_focused;
         lv_style_t option_btn;
         lv_style_t subtitle;
     } styles;
     lv_obj_t *nav_content;
+    lv_obj_t *btn_steam;
+    lv_obj_t *btn_hydra;
     lv_obj_t *selected_host;
     lv_obj_t *add_host;
     lv_obj_t *gamepads;
@@ -104,7 +109,7 @@ static void constructor(lv_fragment_t *self, void *arg) {
     app_ui_fragment_args_t *fargs = arg;
     launcher_fragment *fragment = (launcher_fragment *) self;
     fragment->app = fargs->app;
-    fragment->col_dsc[0] = LV_DPX(250);
+    fragment->col_dsc[0] = LV_DPX(280);
     fragment->col_dsc[1] = LV_DPX(350);
     fragment->col_dsc[2] = LV_GRID_TEMPLATE_LAST;
     fragment->row_dsc[0] = LV_DPX(40);
@@ -153,6 +158,21 @@ static void constructor(lv_fragment_t *self, void *arg) {
     lv_style_set_bg_color(&fragment->styles.play_btn_pressed, lv_color_hex(0x4c6b22));
     lv_style_set_bg_opa(&fragment->styles.play_btn_pressed, LV_OPA_COVER);
 
+    lv_style_init(&fragment->styles.play_btn_hydra);
+    lv_style_set_bg_color(&fragment->styles.play_btn_hydra, lv_color_hex(0x1b2838));
+    lv_style_set_bg_opa(&fragment->styles.play_btn_hydra, LV_OPA_COVER);
+    lv_style_set_border_width(&fragment->styles.play_btn_hydra, LV_DPX(1));
+    lv_style_set_border_color(&fragment->styles.play_btn_hydra, lv_color_hex(0x66c0f4));
+    lv_style_set_border_opa(&fragment->styles.play_btn_hydra, LV_OPA_70);
+    lv_style_set_radius(&fragment->styles.play_btn_hydra, LV_DPX(3));
+    lv_style_set_text_color(&fragment->styles.play_btn_hydra, lv_color_white());
+
+    lv_style_init(&fragment->styles.play_btn_hydra_focused);
+    lv_style_set_bg_color(&fragment->styles.play_btn_hydra_focused, lv_color_hex(0x2a475e));
+    lv_style_set_outline_width(&fragment->styles.play_btn_hydra_focused, LV_DPX(2));
+    lv_style_set_outline_color(&fragment->styles.play_btn_hydra_focused, lv_color_hex(0x66c0f4));
+    lv_style_set_outline_opa(&fragment->styles.play_btn_hydra_focused, LV_OPA_COVER);
+
     lv_style_init(&fragment->styles.option_btn);
     lv_style_set_bg_color(&fragment->styles.option_btn, lv_color_hex(0x2a475e));
     lv_style_set_bg_opa(&fragment->styles.option_btn, LV_OPA_COVER);
@@ -166,6 +186,8 @@ static void constructor(lv_fragment_t *self, void *arg) {
 static void destructor(lv_fragment_t *self) {
     launcher_fragment *fragment = (launcher_fragment *) self;
     lv_style_reset(&fragment->styles.option_btn);
+    lv_style_reset(&fragment->styles.play_btn_hydra_focused);
+    lv_style_reset(&fragment->styles.play_btn_hydra);
     lv_style_reset(&fragment->styles.play_btn_pressed);
     lv_style_reset(&fragment->styles.play_btn_focused);
     lv_style_reset(&fragment->styles.play_btn);
@@ -242,29 +264,63 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_grid_dsc_array(nav_content, fragment->col_dsc, fragment->row_dsc);
     lv_obj_set_style_pad_gap(nav_content, LV_DPX(20), 0);
 
-    lv_obj_t *btn_play = lv_btn_create(nav_content);
-    lv_obj_add_flag(btn_play, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_add_style(btn_play, &fragment->styles.play_btn, 0);
-    lv_obj_add_style(btn_play, &fragment->styles.play_btn_focused, LV_STATE_FOCUS_KEY);
-    lv_obj_add_style(btn_play, &fragment->styles.play_btn_pressed, LV_STATE_PRESSED);
-    lv_obj_set_size(btn_play, LV_SIZE_CONTENT, LV_DPX(200));
-    lv_obj_set_flex_flow(btn_play, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(btn_play, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_grid_cell(btn_play, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0, 5);
+    lv_obj_t *play_col = lv_obj_create(nav_content);
+    lv_obj_remove_style_all(play_col);
+    lv_obj_set_grid_cell(play_col, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0, 5);
+    lv_obj_set_flex_flow(play_col, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(play_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(play_col, LV_DPX(16), 0);
+    lv_obj_clear_flag(play_col, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *img_play = lv_label_create(btn_play);
-    lv_obj_set_style_text_font(img_play, fragment->app->ui->iconfont.heading1, 0);
-    lv_obj_set_style_text_color(img_play, lv_color_white(), 0);
-    lv_label_set_text_static(img_play, BS_SYMBOL_PLAY_CIRCLE_FILL);
-    lv_obj_t *label_play = lv_label_create(btn_play);
-    lv_obj_set_style_text_font(label_play, fragment->app->ui->font.heading3, 0);
-    lv_obj_set_style_text_color(label_play, lv_color_white(), 0);
-    lv_label_set_text(label_play, "ИГРАТЬ");
-    lv_obj_t *label_play_sub = lv_label_create(btn_play);
-    lv_obj_set_style_text_color(label_play_sub, lv_color_hex(0xd2e885), 0);
-    lv_label_set_text(label_play_sub, "Запустить Remote Play");
+    lv_obj_t *btn_steam = lv_btn_create(play_col);
+    fragment->btn_steam = btn_steam;
+    lv_obj_add_flag(btn_steam, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(btn_steam, &fragment->styles.play_btn, 0);
+    lv_obj_add_style(btn_steam, &fragment->styles.play_btn_focused, LV_STATE_FOCUS_KEY);
+    lv_obj_add_style(btn_steam, &fragment->styles.play_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_width(btn_steam, LV_PCT(100));
+    lv_obj_set_height(btn_steam, LV_DPX(120));
+    lv_obj_set_flex_flow(btn_steam, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(btn_steam, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_user_data(btn_steam, (void *) (intptr_t) IHS_StreamInterfaceBigPicture);
 
-    lv_obj_add_event_cb(btn_play, request_session, LV_EVENT_CLICKED, fragment);
+    lv_obj_t *img_steam = lv_label_create(btn_steam);
+    lv_obj_set_style_text_font(img_steam, fragment->app->ui->iconfont.heading2, 0);
+    lv_obj_set_style_text_color(img_steam, lv_color_white(), 0);
+    lv_label_set_text_static(img_steam, BS_SYMBOL_STEAM);
+    lv_obj_t *label_steam = lv_label_create(btn_steam);
+    lv_obj_set_style_text_font(label_steam, fragment->app->ui->font.heading3, 0);
+    lv_obj_set_style_text_color(label_steam, lv_color_white(), 0);
+    lv_label_set_text(label_steam, "Запустить в Steam");
+    lv_obj_t *label_steam_sub = lv_label_create(btn_steam);
+    lv_obj_set_style_text_color(label_steam_sub, lv_color_hex(0xd2e885), 0);
+    lv_label_set_text(label_steam_sub, "Big Picture · Steam Link");
+    lv_obj_add_event_cb(btn_steam, request_session, LV_EVENT_CLICKED, fragment);
+
+    lv_obj_t *btn_hydra = lv_btn_create(play_col);
+    fragment->btn_hydra = btn_hydra;
+    lv_obj_add_flag(btn_hydra, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(btn_hydra, &fragment->styles.play_btn_hydra, 0);
+    lv_obj_add_style(btn_hydra, &fragment->styles.play_btn_hydra_focused, LV_STATE_FOCUS_KEY);
+    lv_obj_add_style(btn_hydra, &fragment->styles.play_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_width(btn_hydra, LV_PCT(100));
+    lv_obj_set_height(btn_hydra, LV_DPX(120));
+    lv_obj_set_flex_flow(btn_hydra, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(btn_hydra, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_user_data(btn_hydra, (void *) (intptr_t) IHS_StreamInterfaceDesktop);
+
+    lv_obj_t *img_hydra = lv_label_create(btn_hydra);
+    lv_obj_set_style_text_font(img_hydra, fragment->app->ui->iconfont.heading2, 0);
+    lv_obj_set_style_text_color(img_hydra, lv_color_hex(0x66c0f4), 0);
+    lv_label_set_text_static(img_hydra, BS_SYMBOL_CONTROLLER);
+    lv_obj_t *label_hydra = lv_label_create(btn_hydra);
+    lv_obj_set_style_text_font(label_hydra, fragment->app->ui->font.heading3, 0);
+    lv_obj_set_style_text_color(label_hydra, lv_color_white(), 0);
+    lv_label_set_text(label_hydra, "Запустить в Hydra");
+    lv_obj_t *label_hydra_sub = lv_label_create(btn_hydra);
+    lv_obj_set_style_text_color(label_hydra_sub, lv_color_hex(0x66c0f4), 0);
+    lv_label_set_text(label_hydra_sub, "Рабочий стол · Steam Link");
+    lv_obj_add_event_cb(btn_hydra, request_session, LV_EVENT_CLICKED, fragment);
 
     lv_obj_t *selected_host = launch_option_create_label_action(fragment, BS_SYMBOL_DISPLAY, NULL);
     fragment->selected_host = selected_host;
@@ -279,25 +335,29 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->gamepads = gamepads;
 
     lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_RIGHT, btn_support);
-    lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_BOTTOM, btn_play);
+    lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_BOTTOM, btn_steam);
     lv_obj_set_dir_focus_obj(btn_support, LV_DIR_RIGHT, btn_quit);
     lv_obj_set_dir_focus_obj(btn_support, LV_DIR_LEFT, btn_settings);
-    lv_obj_set_dir_focus_obj(btn_support, LV_DIR_BOTTOM, btn_play);
+    lv_obj_set_dir_focus_obj(btn_support, LV_DIR_BOTTOM, btn_steam);
     lv_obj_set_dir_focus_obj(btn_quit, LV_DIR_LEFT, btn_support);
-    lv_obj_set_dir_focus_obj(btn_quit, LV_DIR_BOTTOM, btn_play);
+    lv_obj_set_dir_focus_obj(btn_quit, LV_DIR_BOTTOM, btn_steam);
 
-    lv_obj_set_dir_focus_obj(btn_play, LV_DIR_TOP, btn_settings);
-    lv_obj_set_dir_focus_obj(btn_play, LV_DIR_RIGHT, selected_host);
+    lv_obj_set_dir_focus_obj(btn_steam, LV_DIR_TOP, btn_settings);
+    lv_obj_set_dir_focus_obj(btn_steam, LV_DIR_BOTTOM, btn_hydra);
+    lv_obj_set_dir_focus_obj(btn_steam, LV_DIR_RIGHT, selected_host);
 
-    lv_obj_set_dir_focus_obj(selected_host, LV_DIR_LEFT, btn_play);
+    lv_obj_set_dir_focus_obj(btn_hydra, LV_DIR_TOP, btn_steam);
+    lv_obj_set_dir_focus_obj(btn_hydra, LV_DIR_RIGHT, selected_host);
+
+    lv_obj_set_dir_focus_obj(selected_host, LV_DIR_LEFT, btn_steam);
     lv_obj_set_dir_focus_obj(selected_host, LV_DIR_TOP, btn_settings);
     lv_obj_set_dir_focus_obj(selected_host, LV_DIR_BOTTOM, add_host);
 
-    lv_obj_set_dir_focus_obj(add_host, LV_DIR_LEFT, btn_play);
+    lv_obj_set_dir_focus_obj(add_host, LV_DIR_LEFT, btn_hydra);
     lv_obj_set_dir_focus_obj(add_host, LV_DIR_TOP, selected_host);
     lv_obj_set_dir_focus_obj(add_host, LV_DIR_BOTTOM, gamepads);
 
-    lv_obj_set_dir_focus_obj(gamepads, LV_DIR_LEFT, btn_play);
+    lv_obj_set_dir_focus_obj(gamepads, LV_DIR_LEFT, btn_hydra);
     lv_obj_set_dir_focus_obj(gamepads, LV_DIR_TOP, add_host);
 
     return win;
@@ -432,8 +492,9 @@ static void request_session(lv_event_t *e) {
     if (host == NULL) {
         return;
     }
-    IHS_HostInfo *data = calloc(1, sizeof(IHS_HostInfo));
-    *data = *host;
+    connection_launch_args_t *data = calloc(1, sizeof(connection_launch_args_t));
+    data->host = *host;
+    data->stream_interface = (IHS_StreamInterface) (intptr_t) lv_obj_get_user_data(lv_event_get_current_target(e));
     app_ui_push_fragment(fragment->app->ui, &connection_fragment_class, data);
 }
 

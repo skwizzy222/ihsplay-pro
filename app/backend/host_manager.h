@@ -41,6 +41,9 @@ array_list_t *host_manager_get_hosts(host_manager_t *manager);
 
 void host_manager_session_request(host_manager_t *manager, const IHS_HostInfo *host);
 
+void host_manager_session_request_ex(host_manager_t *manager, const IHS_HostInfo *host,
+                                     IHS_StreamInterface stream_interface);
+
 /**
  * Retry streaming with an explicit PIN (Steam "PIN required" flow).
  */

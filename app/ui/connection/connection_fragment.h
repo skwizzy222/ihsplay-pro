@@ -1,6 +1,12 @@
 #pragma once
 
 #include "lvgl.h"
+#include <ihslib.h>
+
+typedef struct connection_launch_args_t {
+    IHS_HostInfo host;
+    IHS_StreamInterface stream_interface;
+} connection_launch_args_t;
 
 extern const lv_fragment_class_t connection_fragment_class;
 

@@ -17,6 +17,7 @@ struct host_manager_t {
     SDL_TimerID timer;
     array_list_t *hosts;
     array_list_t *listeners;
+    IHS_StreamInterface pending_stream_interface;
 };
 
 typedef struct host_manager_session_error_t {
@@ -119,7 +120,9 @@ array_list_t *host_manager_get_hosts(host_manager_t *manager) {
     return manager->hosts;
 }
 
-static void session_request_internal(host_manager_t *manager, const IHS_HostInfo *host, const char *pin) {
+static void session_request_internal(host_manager_t *manager, const IHS_HostInfo *host, const char *pin,
+                                     IHS_StreamInterface stream_interface) {
+    manager->pending_stream_interface = stream_interface;
     IHS_StreamingRequest request = {
             .audioChannelCount = 2,
             .streamingEnable.audio = true,
@@ -127,7 +130,7 @@ static void session_request_internal(host_manager_t *manager, const IHS_HostInfo
             .streamingEnable.input = true,
             .maxResolution.x = 1920,
             .maxResolution.y = 1080,
-            .streamingInterface = IHS_StreamInterfaceDesktop,
+            .streamingInterface = stream_interface,
     };
     if (pin != NULL && pin[0] != '\0') {
         strncpy(request.pin, pin, sizeof(request.pin) - 1);
@@ -137,11 +140,16 @@ static void session_request_internal(host_manager_t *manager, const IHS_HostInfo
 }
 
 void host_manager_session_request(host_manager_t *manager, const IHS_HostInfo *host) {
-    session_request_internal(manager, host, NULL);
+    session_request_internal(manager, host, NULL, IHS_StreamInterfaceDesktop);
+}
+
+void host_manager_session_request_ex(host_manager_t *manager, const IHS_HostInfo *host,
+                                     IHS_StreamInterface stream_interface) {
+    session_request_internal(manager, host, NULL, stream_interface);
 }
 
 void host_manager_session_request_with_pin(host_manager_t *manager, const IHS_HostInfo *host, const char *pin) {
-    session_request_internal(manager, host, pin);
+    session_request_internal(manager, host, pin, manager->pending_stream_interface);
 }
 
 bool host_manager_session_cancel(host_manager_t *manager) {
