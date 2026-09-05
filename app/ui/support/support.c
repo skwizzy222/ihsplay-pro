@@ -55,6 +55,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *parent) {
     support_fragment_t *fragment = (support_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(parent);
     lv_win_add_title(win, "Support");
+    app_lv_win_add_close_btn(win, fragment->app);
     lv_obj_set_size(win, LV_PCT(100), LV_PCT(100));
     fragment->win_content = lv_win_get_content(win);
     lv_obj_set_style_pad_row(fragment->win_content, LV_DPX(15), 0);

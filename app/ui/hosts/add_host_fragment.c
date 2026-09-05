@@ -150,7 +150,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->back_btn = lv_btn_create(actions);
     lv_obj_t *back_label = lv_label_create(fragment->back_btn);
-    lv_label_set_text(back_label, "Back");
+    lv_label_set_text(back_label, "Close");
     lv_obj_center(back_label);
     lv_obj_add_event_cb(fragment->back_btn, nav_back_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->back_btn, keypad_key, LV_EVENT_KEY, NULL);

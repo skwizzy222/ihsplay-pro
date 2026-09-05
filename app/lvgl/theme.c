@@ -1,9 +1,11 @@
 #include "theme.h"
 #include "config.h"
 
+#include "app.h"
 #include "ui/app_ui.h"
 
 #include "ext/msgbox_ext.h"
+#include "lvgl/fonts/bootstrap-icons/symbols.h"
 
 /* Steam-inspired palette:
  *  #171a21 header / deepest
@@ -292,23 +294,34 @@ lv_obj_t *app_lv_win_create(lv_obj_t *parent) {
     lv_obj_t *win = lv_win_create(parent, app_win_header_size(theme));
     lv_obj_t *header = lv_win_get_header(win);
     lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-
-#if IHSPLAY_WIP_FEATURES
-    lv_obj_t *footer = lv_obj_create(win);
-    lv_obj_set_style_bg_opa(footer, LV_OPA_60, 0);
-    lv_obj_set_style_bg_color(footer, lv_color_hex(STEAM_BG_DEEP), 0);
-    lv_obj_set_style_pad_hor(footer, lv_obj_get_style_pad_left(header, 0), 0);
-    lv_obj_set_size(footer, LV_PCT(100), LV_DPX(40));
-    lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-    lv_obj_t *prompt_a = lv_label_create(footer);
-    lv_label_set_text(prompt_a, "(A) Open");
-
-    lv_obj_t *prompt_b = lv_label_create(footer);
-    lv_label_set_text(prompt_b, "(B) Back");
-#endif
+    lv_obj_set_style_pad_gap(header, LV_DPX(12), 0);
     return win;
+}
+
+static void win_close_clicked(lv_event_t *e) {
+    app_t *app = lv_event_get_user_data(e);
+    app_ui_pop_top_fragment(app->ui);
+}
+
+lv_obj_t *app_lv_win_add_close_btn(lv_obj_t *win, app_t *app) {
+    lv_obj_t *header = lv_win_get_header(win);
+    lv_obj_t *btn = lv_btn_create(header);
+    lv_obj_set_height(btn, LV_DPX(44));
+    lv_obj_set_style_pad_hor(btn, LV_DPX(18), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(STEAM_BG_PANEL), 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(STEAM_FOCUS), LV_STATE_FOCUS_KEY);
+    lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(btn, LV_DPX(8), 0);
+
+    lv_obj_t *icon = lv_label_create(btn);
+    lv_label_set_text_static(icon, BS_SYMBOL_X_LG);
+
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, "Close");
+
+    lv_obj_add_event_cb(btn, win_close_clicked, LV_EVENT_CLICKED, app);
+    return btn;
 }
 
 static void apply_cb(lv_theme_t *theme, lv_obj_t *obj) {

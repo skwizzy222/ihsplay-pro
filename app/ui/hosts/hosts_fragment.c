@@ -122,8 +122,9 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     hosts_fragment *fragment = (hosts_fragment *) self;
     lv_obj_t *win = app_lv_win_create(container);
     lv_win_add_title(win, "Your Computers");
-    lv_obj_t *add_btn = lv_win_add_btn(win, BS_SYMBOL_WINDOW_DESKTOP, LV_DPX(40));
+    lv_obj_t *add_btn = lv_win_add_btn(win, BS_SYMBOL_WINDOW_DESKTOP, LV_DPX(44));
     lv_obj_add_event_cb(add_btn, open_add_host, LV_EVENT_CLICKED, fragment);
+    app_lv_win_add_close_btn(win, fragment->app);
 
     lv_obj_t *content = lv_win_get_content(win);
     lv_obj_set_style_pad_hor(content, 0, 0);

@@ -78,7 +78,9 @@ static lv_obj_t *conn_create_obj(lv_fragment_t *self, lv_obj_t *container) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(container);
     fragment->title = lv_win_add_title(win, "Connecting");
-    fragment->cancel_btn = lv_win_add_btn(win, BS_SYMBOL_X_LG, LV_DPX(40));
+    fragment->cancel_btn = app_lv_win_add_close_btn(win, fragment->app);
+    /* Close must cancel pairing/stream request, not only pop UI. */
+    lv_obj_remove_event_cb(fragment->cancel_btn, NULL);
     lv_obj_add_event_cb(fragment->cancel_btn, cancel_clicked, LV_EVENT_CLICKED, fragment);
     fragment->content = lv_win_get_content(win);
     return win;
