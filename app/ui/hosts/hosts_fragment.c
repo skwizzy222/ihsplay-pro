@@ -13,6 +13,7 @@
 #include "logging.h"
 #include "lvgl/theme.h"
 #include "ui/launcher.h"
+#include "ui/hosts/add_host_fragment.h"
 
 typedef struct hosts_fragment {
     lv_fragment_t base;
@@ -74,6 +75,8 @@ static void msgbox_del_cb(lv_event_t *e);
 
 static void authorization_cancel_cb(lv_event_t *e);
 
+static void open_add_host(lv_event_t *e);
+
 const lv_fragment_class_t hosts_fragment_class = {
         .constructor_cb = constructor,
         .destructor_cb = destructor,
@@ -118,7 +121,9 @@ static void destructor(lv_fragment_t *self) {
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     hosts_fragment *fragment = (hosts_fragment *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    lv_win_add_title(win, "Select Computer");
+    lv_win_add_title(win, "Your Computers");
+    lv_obj_t *add_btn = lv_win_add_btn(win, BS_SYMBOL_WINDOW_DESKTOP, LV_DPX(40));
+    lv_obj_add_event_cb(add_btn, open_add_host, LV_EVENT_CLICKED, fragment);
 
     lv_obj_t *content = lv_win_get_content(win);
     lv_obj_set_style_pad_hor(content, 0, 0);
@@ -188,6 +193,13 @@ static void hosts_changed(array_list_t *list, host_manager_hosts_change change_t
             lv_gridview_set_data_advanced(grid, list, changes, 1);
             break;
         }
+        case HOST_MANAGER_HOSTS_REMOVED: {
+            lv_gridview_data_change_t changes[] = {
+                    {.start = change_index, .remove_count = 1, .add_count = 0}
+            };
+            lv_gridview_set_data_advanced(grid, list, changes, 1);
+            break;
+        }
     }
 }
 
@@ -230,6 +242,11 @@ static void authorization_cancel_cb(lv_event_t *e) {
     host_manager_authorization_cancel(fragment->app->host_manager);
 }
 
+static void open_add_host(lv_event_t *e) {
+    hosts_fragment *fragment = lv_event_get_user_data(e);
+    app_ui_push_fragment(fragment->app->ui, &add_host_fragment_class, NULL);
+}
+
 static int host_item_count(lv_obj_t *grid, void *data) {
     LV_UNUSED(grid);
     return array_list_size(data);
@@ -251,8 +268,12 @@ static lv_obj_t *host_item_create(lv_obj_t *grid) {
     lv_obj_clear_flag(holder->icon, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_size(holder->icon, LV_DPX(128), LV_DPX(128));
     lv_obj_set_style_text_font(holder->icon, fragment->app->ui->iconfont.huge, 0);
-    lv_obj_set_style_bg_color(holder->icon, lv_color_white(), 0);
-    lv_obj_set_style_bg_opa(holder->icon, LV_OPA_30, 0);
+    lv_obj_set_style_text_color(holder->icon, lv_color_hex(0x66c0f4), 0);
+    lv_obj_set_style_bg_color(holder->icon, lv_color_hex(0x1b2838), 0);
+    lv_obj_set_style_bg_opa(holder->icon, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(holder->icon, LV_DPX(2), 0);
+    lv_obj_set_style_border_color(holder->icon, lv_color_hex(0x66c0f4), 0);
+    lv_obj_set_style_border_opa(holder->icon, LV_OPA_40, 0);
     lv_obj_set_style_radius(holder->icon, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_img_src(holder->icon, BS_SYMBOL_DISPLAY, 0);
 

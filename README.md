@@ -1,24 +1,38 @@
+# IHSplay Pro
+
+Steam-styled **Steam Remote Play** client for LG webOS TVs (fork of [IHSplay](https://github.com/mariotaku/ihsplay)).
+
+## Install on TV (Homebrew Channel)
+
+1. Open **Homebrew Channel → Settings → Add repository**
+2. Paste:
+
 ```
-    ______  _______       __
-   /  _/ / / / ___/____  / /___ ___  __      In-Home
-   / // /_/ /\__ \/ __ \/ / __ `/ / / /     Streaming
- _/ // __  /___/ / /_/ / / /_/ / /_/ /     Player
-/___/_/ /_//____/ .___/_/\__,_/\__, /     For Steam
-               /_/            /____/
+https://raw.githubusercontent.com/skwizzy222/ihsplay-pro/main/homebrew/repo.json
 ```
 
-IHSplay is an SDL2 based Steam Link Client, primarily targeting webOS TV
-and Raspberry Pi.
+3. Find **Steam Remote Play** (`org.ihsplay.pro`) → Install
 
-The application will be providing a TV remote / gamepad friendly UI, and
-low latency video / audio output, as well as generic mouse / keyboard /
-gamepad support.
+This is a **separate app** from upstream IHSplay (`org.mariotaku.ihsplay`).
 
----
+## What's new
 
-![Home UI](https://user-images.githubusercontent.com/830358/219081008-e5eb646a-76fa-4683-9869-35e3923618ce.png)
+- Steam-inspired UI (navy / `#66c0f4` / green PLAY)
+- Cancel while connecting / pairing
+- Streaming PIN pad
+- Add computer by IP (unicast discovery)
+- Video keyframe recovery fix
+- Safer gamepad hotplug
+- Persistent device identity
 
-![Streaming Overlay](https://user-images.githubusercontent.com/830358/207047480-8cc96496-4fab-4a0e-8d1a-896183c54a6e.png)
+## Build webOS IPK (WSL)
 
+```bash
+./tools/webos/setup_ndk.sh
+./tools/webos/build_ipk_wsl.sh
+# → dist/org.ihsplay.pro_*_arm.ipk
+```
 
-Stay tuned!
+## License
+
+GPL-3.0 (same as upstream IHSplay).

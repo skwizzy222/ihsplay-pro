@@ -8,7 +8,9 @@
 #include "ui/session/session.h"
 #include "util/random.h"
 #include "pin_fragment.h"
+#include "stream_pin_fragment.h"
 #include "conn_error_fragment.h"
+#include "lvgl/fonts/bootstrap-icons/symbols.h"
 
 
 typedef struct connection_fragment_t {
@@ -17,6 +19,8 @@ typedef struct connection_fragment_t {
     IHS_HostInfo host;
     lv_obj_t *content;
     lv_obj_t *title;
+    lv_obj_t *cancel_btn;
+    bool awaiting_stream_pin;
 } connection_fragment_t;
 
 static void conn_ctor(lv_fragment_t *self, void *arg);
@@ -37,7 +41,11 @@ static void authorization_failed(const IHS_HostInfo *host, IHS_AuthorizationResu
 
 static void open_authorization(connection_fragment_t *fragment, const IHS_HostInfo *info);
 
+static void open_stream_pin(connection_fragment_t *fragment);
+
 static void conn_show_page(connection_fragment_t *fragment, const lv_fragment_class_t *cls, void *data);
+
+static void cancel_clicked(lv_event_t *e);
 
 const lv_fragment_class_t connection_fragment_class = {
         .constructor_cb = conn_ctor,
@@ -59,6 +67,7 @@ static void conn_ctor(lv_fragment_t *self, void *arg) {
     app_ui_fragment_args_t *args = arg;
     fragment->app = args->app;
     fragment->host = (*(IHS_HostInfo *) args->data);
+    fragment->awaiting_stream_pin = false;
     free(args->data);
 }
 
@@ -66,26 +75,47 @@ static lv_obj_t *conn_create_obj(lv_fragment_t *self, lv_obj_t *container) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(container);
     fragment->title = lv_win_add_title(win, "Connecting");
+    fragment->cancel_btn = lv_win_add_btn(win, BS_SYMBOL_X_LG, LV_DPX(40));
+    lv_obj_add_event_cb(fragment->cancel_btn, cancel_clicked, LV_EVENT_CLICKED, fragment);
     fragment->content = lv_win_get_content(win);
     return win;
 }
 
 static void conn_obj_created(lv_fragment_t *self, lv_obj_t *obj) {
+    (void) obj;
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     host_manager_t *hosts_manager = fragment->app->host_manager;
     host_manager_register_listener(hosts_manager, &conn_host_listener, fragment);
+    connection_fragment_set_title(self, "Connecting");
     host_manager_session_request(hosts_manager, &fragment->host);
 }
 
 static void conn_obj_will_del(lv_fragment_t *self, lv_obj_t *obj) {
+    (void) obj;
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     host_manager_t *hosts_manager = fragment->app->host_manager;
+    host_manager_session_cancel(hosts_manager);
+    host_manager_authorization_cancel(hosts_manager);
     host_manager_unregister_listener(hosts_manager, &conn_host_listener);
 }
 
 void connection_fragment_set_title(lv_fragment_t *self, const char *title) {
     connection_fragment_t *fragment = (connection_fragment_t *) self;
     lv_label_set_text(fragment->title, title);
+}
+
+void connection_fragment_submit_stream_pin(lv_fragment_t *self, const char *pin) {
+    connection_fragment_t *fragment = (connection_fragment_t *) self;
+    fragment->awaiting_stream_pin = false;
+    connection_fragment_set_title(self, "Connecting");
+    host_manager_session_request_with_pin(fragment->app->host_manager, &fragment->host, pin);
+}
+
+void connection_fragment_cancel(lv_fragment_t *self) {
+    connection_fragment_t *fragment = (connection_fragment_t *) self;
+    host_manager_session_cancel(fragment->app->host_manager);
+    host_manager_authorization_cancel(fragment->app->host_manager);
+    app_ui_pop_top_fragment(fragment->app->ui);
 }
 
 static void session_started(const IHS_HostInfo *host, const IHS_SessionInfo *info, void *context) {
@@ -102,6 +132,10 @@ static void session_start_failed(const IHS_HostInfo *host, IHS_StreamingResult r
     connection_fragment_t *fragment = (connection_fragment_t *) context;
     if (result == IHS_StreamingUnauthorized) {
         open_authorization(fragment, host);
+    } else if (result == IHS_StreamingPINRequired) {
+        open_stream_pin(fragment);
+    } else if (result == IHS_StreamingCanceled) {
+        app_ui_pop_top_fragment(fragment->app->ui);
     } else {
         conn_error_fragment_data data = {
                 .message = streaming_result_str(result),
@@ -114,8 +148,7 @@ static void authorized(const IHS_HostInfo *host, uint64_t steam_id, void *contex
     (void) host;
     (void) steam_id;
     connection_fragment_t *fragment = (connection_fragment_t *) context;
-    // TODO Hide authorization UI
-    // TODO Performance test?
+    connection_fragment_set_title((lv_fragment_t *) fragment, "Connecting");
     host_manager_t *hosts_manager = fragment->app->host_manager;
     host_manager_session_request(hosts_manager, &fragment->host);
 }
@@ -123,6 +156,10 @@ static void authorized(const IHS_HostInfo *host, uint64_t steam_id, void *contex
 static void authorization_failed(const IHS_HostInfo *host, IHS_AuthorizationResult result, void *context) {
     (void) host;
     connection_fragment_t *fragment = (connection_fragment_t *) context;
+    if (result == IHS_AuthorizationCanceled) {
+        app_ui_pop_top_fragment(fragment->app->ui);
+        return;
+    }
     conn_error_fragment_data data = {
             .message = authorization_result_str(result),
     };
@@ -136,8 +173,18 @@ static void open_authorization(connection_fragment_t *fragment, const IHS_HostIn
     conn_show_page(fragment, &pin_fragment_class, pin);
 }
 
+static void open_stream_pin(connection_fragment_t *fragment) {
+    fragment->awaiting_stream_pin = true;
+    conn_show_page(fragment, &stream_pin_fragment_class, NULL);
+}
+
+static void cancel_clicked(lv_event_t *e) {
+    connection_fragment_t *fragment = lv_event_get_user_data(e);
+    connection_fragment_cancel((lv_fragment_t *) fragment);
+}
+
 static void conn_show_page(connection_fragment_t *fragment, const lv_fragment_class_t *cls, void *data) {
-    lv_fragment_t *pin_fragment = app_ui_create_fragment(fragment->app->ui, cls, data);
-    lv_fragment_manager_replace(fragment->base.child_manager, pin_fragment, &fragment->content);
-    lv_obj_set_size(pin_fragment->obj, LV_PCT(100), LV_PCT(100));
+    lv_fragment_t *page = app_ui_create_fragment(fragment->app->ui, cls, data);
+    lv_fragment_manager_replace(fragment->base.child_manager, page, &fragment->content);
+    lv_obj_set_size(page->obj, LV_PCT(100), LV_PCT(100));
 }

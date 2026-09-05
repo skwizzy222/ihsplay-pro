@@ -58,7 +58,8 @@ stream_media_session_t *stream_media_create(stream_manager_t *manager) {
     media_session->manager = manager;
     media_session->lock = SDL_CreateMutex();
     media_session->player = SS4S_PlayerOpen();
-    SS4S_PlayerSetWaitAudioVideoReady(media_session->player, true);
+    /* Do not gate video on audio readiness — a late/failed audio open caused black screens. */
+    SS4S_PlayerSetWaitAudioVideoReady(media_session->player, false);
 
     SS4S_GetVideoCapabilities(&media_session->video_cap);
     return media_session;
@@ -148,15 +149,23 @@ static int audio_start(IHS_Session *session, const IHS_StreamAudioConfig *config
             .streamName = "Streaming",
     };
     SDL_UnlockMutex(media_session->lock);
-    return SS4S_PlayerAudioOpen(media_session->player, &info);
+    int audio_rc = SS4S_PlayerAudioOpen(media_session->player, &info);
+    if (audio_rc != 0) {
+        commons_log_error("Media", "Failed to open audio output: %d", audio_rc);
+    }
+    return audio_rc;
 }
 
 static void audio_stop(IHS_Session *session, void *context) {
     (void) session;
     stream_media_session_t *media_session = (stream_media_session_t *) context;
     SS4S_PlayerAudioClose(media_session->player);
-    opus_multistream_decoder_destroy(media_session->opus_decoder);
+    if (media_session->opus_decoder != NULL) {
+        opus_multistream_decoder_destroy(media_session->opus_decoder);
+        media_session->opus_decoder = NULL;
+    }
     free(media_session->pcm_buffer);
+    media_session->pcm_buffer = NULL;
 }
 
 static int audio_submit(IHS_Session *session, IHS_Buffer *data, void *context) {
@@ -192,7 +201,11 @@ static int video_start(IHS_Session *session, const IHS_StreamVideoConfig *config
     };
     media_session->video_info = info;
     SDL_UnlockMutex(media_session->lock);
-    return SS4S_PlayerVideoOpen(media_session->player, &info);
+    int video_rc = SS4S_PlayerVideoOpen(media_session->player, &info);
+    if (video_rc != 0) {
+        commons_log_error("Media", "Failed to open video decoder: %d", video_rc);
+    }
+    return video_rc;
 }
 
 static void video_stop(IHS_Session *session, void *context) {

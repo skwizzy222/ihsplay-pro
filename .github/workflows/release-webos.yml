@@ -1,0 +1,100 @@
+name: Release webOS IPK
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag without v (e.g. 0.3.0)"
+        required: true
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-webos:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v${{ inputs.version }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download ares-cli-rs
+        uses: robinraju/release-downloader@v1.9
+        with:
+          repository: "webosbrew/ares-cli-rs"
+          latest: true
+          fileName: "ares-package_*.deb"
+          out-file-path: "temp"
+
+      - name: Install Tools
+        run: sudo apt-get install -y ./temp/*.deb
+
+      - name: Download webOS NDK
+        uses: robinraju/release-downloader@v1.9
+        with:
+          repository: "openlgtv/buildroot-nc4"
+          tag: "webos-a38c582"
+          fileName: "arm-webos-linux-gnueabi_sdk-buildroot-x86_64.tar.gz"
+          out-file-path: "/tmp"
+
+      - name: Extract webOS NDK
+        shell: bash
+        working-directory: /tmp
+        run: |
+          tar xzf arm-webos-linux-gnueabi_sdk-buildroot-x86_64.tar.gz
+          ./arm-webos-linux-gnueabi_sdk-buildroot/relocate-sdk.sh
+
+      - name: Build IPK
+        env:
+          TOOLCHAIN_FILE: /tmp/arm-webos-linux-gnueabi_sdk-buildroot/usr/share/buildroot/toolchainfile.cmake
+          CMAKE_BINARY_DIR: build-webos
+        run: |
+          chmod +x tools/webos/*.sh
+          ./tools/webos/build_ipk.sh -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+
+      - name: Generate Homebrew Channel repo files
+        run: |
+          chmod +x tools/webos/gen_homebrew_repo.sh
+          IPK=$(ls dist/org.ihsplay.pro_*_arm.ipk | head -1)
+          ./tools/webos/gen_homebrew_repo.sh "$IPK"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          files: |
+            dist/*.ipk
+            homebrew/org.ihsplay.pro.manifest.json
+          fail_on_unmatched_files: true
+
+      - name: Commit updated homebrew/repo.json
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add homebrew/repo.json homebrew/org.ihsplay.pro.manifest.json
+          if git diff --cached --quiet; then
+            echo "No repo.json changes"
+          else
+            git commit -m "chore: update Homebrew Channel repo for v${{ steps.ver.outputs.version }}"
+            git push origin HEAD:${GITHUB_REF_NAME:-main}
+          fi

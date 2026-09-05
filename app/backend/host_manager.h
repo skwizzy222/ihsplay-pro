@@ -8,7 +8,8 @@ typedef struct array_list_t array_list_t;
 
 typedef enum host_manager_hosts_change {
     HOST_MANAGER_HOSTS_NEW,
-    HOST_MANAGER_HOSTS_UPDATE
+    HOST_MANAGER_HOSTS_UPDATE,
+    HOST_MANAGER_HOSTS_REMOVED
 } host_manager_hosts_change;
 
 typedef struct host_manager_listener_t {
@@ -31,9 +32,21 @@ void host_manager_discovery_start(host_manager_t *manager);
 
 void host_manager_discovery_stop(host_manager_t *manager);
 
+/**
+ * Probe a host by IP when broadcast discovery fails.
+ */
+bool host_manager_discover_at(host_manager_t *manager, const char *ip);
+
 array_list_t *host_manager_get_hosts(host_manager_t *manager);
 
 void host_manager_session_request(host_manager_t *manager, const IHS_HostInfo *host);
+
+/**
+ * Retry streaming with an explicit PIN (Steam "PIN required" flow).
+ */
+void host_manager_session_request_with_pin(host_manager_t *manager, const IHS_HostInfo *host, const char *pin);
+
+bool host_manager_session_cancel(host_manager_t *manager);
 
 void host_manager_register_listener(host_manager_t *manager, const host_manager_listener_t *listener, void *context);
 

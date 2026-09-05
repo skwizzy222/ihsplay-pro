@@ -3,6 +3,7 @@ target_sources(ihsplay PRIVATE
         app_ui_font.c
         launcher.c
         hosts/hosts_fragment.c
+        hosts/add_host_fragment.c
         settings/settings.c
         settings/basic.c
         settings/widgets.c)

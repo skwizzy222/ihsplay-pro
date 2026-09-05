@@ -1,8 +1,6 @@
 #include "logging.h"
 #include "input_manager.h"
 
-#include <assert.h>
-
 #include "ihslib/hid/sdl.h"
 
 static void insert_controller(input_manager_t *manager, SDL_JoystickID id, SDL_GameController *controller);
@@ -64,7 +62,10 @@ void input_manager_sdl_gamepad_added(input_manager_t *manager, int which) {
 void input_manager_sdl_gamepad_removed(input_manager_t *manager, SDL_JoystickID which) {
     commons_log_info("Input", "Removing gamepad, instance_id: #%d.", which);
     int index = manager_index(manager, which);
-    assert(index >= 0);
+    if (index < 0) {
+        commons_log_warn("Input", "Gamepad #%d was not tracked; ignoring remove event.", which);
+        return;
+    }
     opened_controller_t *controller = array_list_get(&manager->controllers, index);
     SDL_GameControllerClose(controller->controller);
     remove_controller_at(manager, index);

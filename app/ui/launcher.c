@@ -6,6 +6,7 @@
 #include "launcher.h"
 
 #include "hosts/hosts_fragment.h"
+#include "hosts/add_host_fragment.h"
 #include "settings/settings.h"
 #include "support/support.h"
 
@@ -22,13 +23,19 @@
 typedef struct launcher_fragment {
     lv_fragment_t base;
     app_t *app;
-    lv_coord_t row_dsc[5], col_dsc[4];
+    lv_coord_t row_dsc[6], col_dsc[4];
     struct {
         lv_style_t root;
         lv_style_t option_icon;
+        lv_style_t play_btn;
+        lv_style_t play_btn_focused;
+        lv_style_t play_btn_pressed;
+        lv_style_t option_btn;
+        lv_style_t subtitle;
     } styles;
     lv_obj_t *nav_content;
     lv_obj_t *selected_host;
+    lv_obj_t *add_host;
     lv_obj_t *gamepads;
 
     uint64_t selected_host_id;
@@ -68,6 +75,8 @@ static void open_support(lv_event_t *e);
 
 static void select_host(lv_event_t *e);
 
+static void add_host_clicked(lv_event_t *e);
+
 static void request_session(lv_event_t *e);
 
 static void launcher_quit(lv_event_t *e);
@@ -101,8 +110,9 @@ static void constructor(lv_fragment_t *self, void *arg) {
     fragment->row_dsc[0] = LV_DPX(40);
     fragment->row_dsc[1] = LV_DPX(40);
     fragment->row_dsc[2] = LV_DPX(40);
-    fragment->row_dsc[3] = LV_GRID_FR(1);
-    fragment->row_dsc[4] = LV_GRID_TEMPLATE_LAST;
+    fragment->row_dsc[3] = LV_DPX(40);
+    fragment->row_dsc[4] = LV_GRID_FR(1);
+    fragment->row_dsc[5] = LV_GRID_TEMPLATE_LAST;
 
     lv_style_init(&fragment->styles.root);
     lv_style_set_pad_gap(&fragment->styles.root, LV_DPX(10));
@@ -112,11 +122,54 @@ static void constructor(lv_fragment_t *self, void *arg) {
 
     lv_style_init(&fragment->styles.option_icon);
     lv_style_set_text_font(&fragment->styles.option_icon, fragment->app->ui->font.heading3);
+    lv_style_set_text_color(&fragment->styles.option_icon, lv_color_hex(0x66c0f4));
     lv_style_set_translate_y(&fragment->styles.option_icon, LV_DPX(4));
+
+    lv_style_init(&fragment->styles.subtitle);
+    lv_style_set_text_color(&fragment->styles.subtitle, lv_color_hex(0x8f98a0));
+    lv_style_set_text_font(&fragment->styles.subtitle, fragment->app->ui->font.small);
+
+    lv_style_init(&fragment->styles.play_btn);
+    lv_style_set_bg_color(&fragment->styles.play_btn, lv_color_hex(0x5c7e10));
+    lv_style_set_bg_opa(&fragment->styles.play_btn, LV_OPA_COVER);
+    lv_style_set_border_width(&fragment->styles.play_btn, 0);
+    lv_style_set_radius(&fragment->styles.play_btn, LV_DPX(3));
+    lv_style_set_shadow_width(&fragment->styles.play_btn, LV_DPX(20));
+    lv_style_set_shadow_color(&fragment->styles.play_btn, lv_color_hex(0x5c7e10));
+    lv_style_set_shadow_opa(&fragment->styles.play_btn, LV_OPA_30);
+    lv_style_set_text_color(&fragment->styles.play_btn, lv_color_white());
+
+    lv_style_init(&fragment->styles.play_btn_focused);
+    lv_style_set_bg_color(&fragment->styles.play_btn_focused, lv_color_hex(0x75b022));
+    lv_style_set_bg_opa(&fragment->styles.play_btn_focused, LV_OPA_COVER);
+    lv_style_set_shadow_width(&fragment->styles.play_btn_focused, LV_DPX(28));
+    lv_style_set_shadow_opa(&fragment->styles.play_btn_focused, LV_OPA_50);
+    lv_style_set_outline_width(&fragment->styles.play_btn_focused, LV_DPX(2));
+    lv_style_set_outline_color(&fragment->styles.play_btn_focused, lv_color_hex(0xbeee11));
+    lv_style_set_outline_opa(&fragment->styles.play_btn_focused, LV_OPA_COVER);
+    lv_style_set_outline_pad(&fragment->styles.play_btn_focused, LV_DPX(3));
+
+    lv_style_init(&fragment->styles.play_btn_pressed);
+    lv_style_set_bg_color(&fragment->styles.play_btn_pressed, lv_color_hex(0x4c6b22));
+    lv_style_set_bg_opa(&fragment->styles.play_btn_pressed, LV_OPA_COVER);
+
+    lv_style_init(&fragment->styles.option_btn);
+    lv_style_set_bg_color(&fragment->styles.option_btn, lv_color_hex(0x2a475e));
+    lv_style_set_bg_opa(&fragment->styles.option_btn, LV_OPA_COVER);
+    lv_style_set_radius(&fragment->styles.option_btn, LV_DPX(3));
+    lv_style_set_border_width(&fragment->styles.option_btn, LV_DPX(1));
+    lv_style_set_border_color(&fragment->styles.option_btn, lv_color_hex(0x3d6a8a));
+    lv_style_set_border_opa(&fragment->styles.option_btn, LV_OPA_50);
+    lv_style_set_pad_hor(&fragment->styles.option_btn, LV_DPX(16));
 }
 
 static void destructor(lv_fragment_t *self) {
     launcher_fragment *fragment = (launcher_fragment *) self;
+    lv_style_reset(&fragment->styles.option_btn);
+    lv_style_reset(&fragment->styles.play_btn_pressed);
+    lv_style_reset(&fragment->styles.play_btn_focused);
+    lv_style_reset(&fragment->styles.play_btn);
+    lv_style_reset(&fragment->styles.subtitle);
     lv_style_reset(&fragment->styles.option_icon);
     lv_style_reset(&fragment->styles.root);
 }
@@ -126,23 +179,58 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->num_launch_options = 0;
     lv_obj_t *win = app_lv_win_create(container);
 
-    lv_win_add_title(win, "IHSplay");
+    lv_obj_t *header = lv_win_get_header(win);
+    lv_obj_clean(header);
+    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-//    lv_obj_add_event_cb(actions, focus_content, LV_EVENT_KEY, fragment);
-    lv_obj_add_event_cb(lv_win_get_header(win), focus_content, LV_EVENT_KEY, fragment);
+    lv_obj_t *brand_icon = lv_label_create(header);
+    lv_obj_set_style_text_font(brand_icon, fragment->app->ui->iconfont.heading2, 0);
+    lv_obj_set_style_text_color(brand_icon, lv_color_hex(0x66c0f4), 0);
+    lv_label_set_text_static(brand_icon, BS_SYMBOL_STEAM);
 
-    lv_obj_t *btn_settings = lv_win_add_btn(win, BS_SYMBOL_GEAR_FILL, LV_DPX(40));
+    lv_obj_t *brand_title = lv_label_create(header);
+    lv_obj_set_style_text_font(brand_title, fragment->app->ui->font.heading2, 0);
+    lv_obj_set_style_text_color(brand_title, lv_color_white(), 0);
+    lv_obj_set_style_pad_left(brand_title, LV_DPX(10), 0);
+    lv_label_set_text(brand_title, "STEAM");
+
+    lv_obj_t *brand_sub = lv_label_create(header);
+    lv_obj_add_style(brand_sub, &fragment->styles.subtitle, 0);
+    lv_obj_set_style_pad_left(brand_sub, LV_DPX(8), 0);
+    lv_label_set_text(brand_sub, "Remote Play");
+
+    lv_obj_t *spacer = lv_obj_create(header);
+    lv_obj_remove_style_all(spacer);
+    lv_obj_set_flex_grow(spacer, 1);
+    lv_obj_set_height(spacer, 1);
+
+    lv_obj_add_event_cb(header, focus_content, LV_EVENT_KEY, fragment);
+
+    lv_obj_t *btn_settings = lv_btn_create(header);
+    lv_obj_set_size(btn_settings, LV_DPX(40), LV_DPX(40));
+    lv_obj_t *btn_settings_icon = lv_label_create(btn_settings);
+    lv_obj_set_style_text_font(btn_settings_icon, fragment->app->ui->iconfont.heading3, 0);
+    lv_label_set_text_static(btn_settings_icon, BS_SYMBOL_GEAR_FILL);
+    lv_obj_center(btn_settings_icon);
     lv_obj_add_event_cb(btn_settings, open_settings, LV_EVENT_CLICKED, fragment);
     lv_obj_add_flag(btn_settings, LV_OBJ_FLAG_EVENT_BUBBLE);
-#if !IHSPLAY_WIP_FEATURES
-    lv_obj_add_flag(btn_settings, LV_OBJ_FLAG_HIDDEN);
-#endif
 
-    lv_obj_t *btn_support = lv_win_add_btn(win, BS_SYMBOL_QUESTION_CIRCLE_FILL, LV_DPX(40));
+    lv_obj_t *btn_support = lv_btn_create(header);
+    lv_obj_set_size(btn_support, LV_DPX(40), LV_DPX(40));
+    lv_obj_t *btn_support_icon = lv_label_create(btn_support);
+    lv_obj_set_style_text_font(btn_support_icon, fragment->app->ui->iconfont.heading3, 0);
+    lv_label_set_text_static(btn_support_icon, BS_SYMBOL_QUESTION_CIRCLE_FILL);
+    lv_obj_center(btn_support_icon);
     lv_obj_add_event_cb(btn_support, open_support, LV_EVENT_CLICKED, fragment);
     lv_obj_add_flag(btn_support, LV_OBJ_FLAG_EVENT_BUBBLE);
 
-    lv_obj_t *btn_quit = lv_win_add_btn(win, BS_SYMBOL_X_LG, LV_DPX(40));
+    lv_obj_t *btn_quit = lv_btn_create(header);
+    lv_obj_set_size(btn_quit, LV_DPX(40), LV_DPX(40));
+    lv_obj_t *btn_quit_icon = lv_label_create(btn_quit);
+    lv_obj_set_style_text_font(btn_quit_icon, fragment->app->ui->iconfont.heading3, 0);
+    lv_label_set_text_static(btn_quit_icon, BS_SYMBOL_X_LG);
+    lv_obj_center(btn_quit_icon);
     lv_obj_add_event_cb(btn_quit, launcher_quit, LV_EVENT_CLICKED, fragment->app);
     lv_obj_add_flag(btn_quit, LV_OBJ_FLAG_EVENT_BUBBLE);
 
@@ -156,16 +244,25 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_t *btn_play = lv_btn_create(nav_content);
     lv_obj_add_flag(btn_play, LV_OBJ_FLAG_EVENT_BUBBLE);
-    lv_obj_set_size(btn_play, LV_SIZE_CONTENT, LV_DPX(180));
+    lv_obj_add_style(btn_play, &fragment->styles.play_btn, 0);
+    lv_obj_add_style(btn_play, &fragment->styles.play_btn_focused, LV_STATE_FOCUS_KEY);
+    lv_obj_add_style(btn_play, &fragment->styles.play_btn_pressed, LV_STATE_PRESSED);
+    lv_obj_set_size(btn_play, LV_SIZE_CONTENT, LV_DPX(200));
     lv_obj_set_flex_flow(btn_play, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(btn_play, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_grid_cell(btn_play, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0, 4);
+    lv_obj_set_grid_cell(btn_play, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0, 5);
 
     lv_obj_t *img_play = lv_label_create(btn_play);
     lv_obj_set_style_text_font(img_play, fragment->app->ui->iconfont.heading1, 0);
+    lv_obj_set_style_text_color(img_play, lv_color_white(), 0);
     lv_label_set_text_static(img_play, BS_SYMBOL_PLAY_CIRCLE_FILL);
     lv_obj_t *label_play = lv_label_create(btn_play);
-    lv_label_set_text(label_play, "Start Streaming");
+    lv_obj_set_style_text_font(label_play, fragment->app->ui->font.heading3, 0);
+    lv_obj_set_style_text_color(label_play, lv_color_white(), 0);
+    lv_label_set_text(label_play, "PLAY");
+    lv_obj_t *label_play_sub = lv_label_create(btn_play);
+    lv_obj_set_style_text_color(label_play_sub, lv_color_hex(0xd2e885), 0);
+    lv_label_set_text(label_play_sub, "Start Remote Play");
 
     lv_obj_add_event_cb(btn_play, request_session, LV_EVENT_CLICKED, fragment);
 
@@ -173,6 +270,10 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->selected_host = selected_host;
 
     lv_obj_add_event_cb(selected_host, select_host, LV_EVENT_CLICKED, fragment);
+
+    lv_obj_t *add_host = launch_option_create_label_action(fragment, BS_SYMBOL_WINDOW_DESKTOP, "Add a computer…");
+    fragment->add_host = add_host;
+    lv_obj_add_event_cb(add_host, add_host_clicked, LV_EVENT_CLICKED, fragment);
 
     lv_obj_t *gamepads = launch_option_create_label_action(fragment, BS_SYMBOL_CONTROLLER, NULL);
     fragment->gamepads = gamepads;
@@ -190,10 +291,14 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_set_dir_focus_obj(selected_host, LV_DIR_LEFT, btn_play);
     lv_obj_set_dir_focus_obj(selected_host, LV_DIR_TOP, btn_settings);
-    lv_obj_set_dir_focus_obj(selected_host, LV_DIR_BOTTOM, gamepads);
+    lv_obj_set_dir_focus_obj(selected_host, LV_DIR_BOTTOM, add_host);
+
+    lv_obj_set_dir_focus_obj(add_host, LV_DIR_LEFT, btn_play);
+    lv_obj_set_dir_focus_obj(add_host, LV_DIR_TOP, selected_host);
+    lv_obj_set_dir_focus_obj(add_host, LV_DIR_BOTTOM, gamepads);
 
     lv_obj_set_dir_focus_obj(gamepads, LV_DIR_LEFT, btn_play);
-    lv_obj_set_dir_focus_obj(gamepads, LV_DIR_TOP, selected_host);
+    lv_obj_set_dir_focus_obj(gamepads, LV_DIR_TOP, add_host);
 
     return win;
 }
@@ -265,6 +370,7 @@ static lv_obj_t *launch_option_create_label_action(launcher_fragment *fragment, 
     int row_pos = fragment->num_launch_options++;
     lv_obj_t *action = lv_btn_create(fragment->nav_content);
     lv_obj_add_flag(action, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_style(action, &fragment->styles.option_btn, 0);
     lv_obj_set_grid_cell(action, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, row_pos, 1);
     lv_obj_set_size(action, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(action, LV_FLEX_FLOW_ROW);
@@ -315,6 +421,11 @@ static void select_host(lv_event_t *e) {
     app_ui_push_fragment(fragment->app->ui, &hosts_fragment_class, fragment);
 }
 
+static void add_host_clicked(lv_event_t *e) {
+    launcher_fragment *fragment = lv_event_get_user_data(e);
+    app_ui_push_fragment(fragment->app->ui, &add_host_fragment_class, NULL);
+}
+
 static void request_session(lv_event_t *e) {
     launcher_fragment *fragment = lv_event_get_user_data(e);
     const IHS_HostInfo *host = get_selected_host(fragment);
@@ -335,7 +446,7 @@ static void hosts_update(launcher_fragment *fragment) {
     if (host != NULL) {
         launch_option_set_text(fragment->selected_host, host->hostname);
     } else {
-        launch_option_set_text(fragment->selected_host, "Select computer...");
+        launch_option_set_text(fragment->selected_host, "Choose a computer…");
     }
 }
 

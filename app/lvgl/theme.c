@@ -5,6 +5,26 @@
 
 #include "ext/msgbox_ext.h"
 
+/* Steam-inspired palette:
+ *  #171a21 header / deepest
+ *  #1b2838 main surface
+ *  #2a475e panels
+ *  #66c0f4 accent text
+ *  #1a9fff focus CTA
+ *  #5c7e10 play green
+ *  #c7d5e0 body text
+ */
+
+#define STEAM_BG_DEEP      0x171a21
+#define STEAM_BG_MAIN      0x1b2838
+#define STEAM_BG_PANEL     0x2a475e
+#define STEAM_ACCENT       0x66c0f4
+#define STEAM_FOCUS        0x1a9fff
+#define STEAM_PLAY         0x5c7e10
+#define STEAM_PLAY_HOVER   0x75b022
+#define STEAM_TEXT         0xc7d5e0
+#define STEAM_TEXT_MUTED   0x8f98a0
+
 static void apply_cb(lv_theme_t *theme, lv_obj_t *obj);
 
 typedef struct theme_context_t {
@@ -54,51 +74,65 @@ void app_theme_init(lv_theme_t *theme, app_ui_t *ui) {
     theme->font_normal = ui->font.body;
     theme->font_large = ui->font.heading3;
 
-    lv_color_t primary_color = lv_color_hex(0x1387b8);
-    lv_color_t accent_color = lv_color_lighten(primary_color, 1);
-    lv_color_t focus_color = lv_color_make(31, 169, 255);
+    lv_color_t primary_color = lv_color_hex(STEAM_FOCUS);
+    lv_color_t accent_color = lv_color_hex(STEAM_ACCENT);
+    lv_color_t focus_color = lv_color_hex(STEAM_FOCUS);
+    lv_color_t text_color = lv_color_hex(STEAM_TEXT);
+    lv_color_t panel_color = lv_color_hex(STEAM_BG_PANEL);
 
     theme->color_primary = primary_color;
+    theme->color_secondary = accent_color;
 
     lv_style_init(&styles->scr);
 
+    /* Vertical Steam gradient: deep navy → blue panel tone */
     const static lv_grad_dsc_t grad = {
             .dir = LV_GRAD_DIR_VER,
             .stops = {
-                    {.color = {.ch = {.red = 0x11, .green = 0x1d, .blue = 0x2e, .alpha = 255}}, .frac = 0},
-                    {.color = {.ch = {.red = 0x05, .green = 0x18, .blue = 0x39, .alpha = 255}}, .frac = 63},
-                    {.color = {.ch = {.red = 0x0a, .green = 0x1b, .blue = 0x48, .alpha = 255}}, .frac = 119},
-                    {.color = {.ch = {.red = 0x13, .green = 0x2e, .blue = 0x62, .alpha = 255}}, .frac = 172},
-                    {.color = {.ch = {.red = 0x14, .green = 0x4b, .blue = 0x7e, .alpha = 255}}, .frac = 216},
-                    {.color = {.ch = {.red = 0x13, .green = 0x64, .blue = 0x97, .alpha = 255}}, .frac = 255},
+                    {.color = {.ch = {.red = 0x17, .green = 0x1a, .blue = 0x21, .alpha = 255}}, .frac = 0},
+                    {.color = {.ch = {.red = 0x1b, .green = 0x28, .blue = 0x38, .alpha = 255}}, .frac = 90},
+                    {.color = {.ch = {.red = 0x1f, .green = 0x32, .blue = 0x46, .alpha = 255}}, .frac = 170},
+                    {.color = {.ch = {.red = 0x2a, .green = 0x47, .blue = 0x5e, .alpha = 255}}, .frac = 255},
             },
-            .stops_count = 6,
+            .stops_count = 4,
     };
     lv_style_set_bg_grad(&styles->scr, &grad);
     lv_style_set_bg_opa(&styles->scr, LV_OPA_COVER);
 
     lv_style_init(&styles->obj);
-    lv_style_set_text_color(&styles->obj, lv_color_white());
+    lv_style_set_text_color(&styles->obj, text_color);
     lv_style_set_pad_gap(&styles->obj, LV_DPX(10));
 
     lv_style_init(&styles->focused);
     lv_style_set_outline_width(&styles->focused, LV_DPX(2));
     lv_style_set_outline_opa(&styles->focused, LV_OPA_COVER);
-    lv_style_set_outline_color(&styles->focused, primary_color);
-    lv_style_set_outline_pad(&styles->focused, LV_DPX(5));
-    lv_style_set_radius(&styles->focused, LV_DPX(5));
+    lv_style_set_outline_color(&styles->focused, accent_color);
+    lv_style_set_outline_pad(&styles->focused, LV_DPX(4));
+    lv_style_set_radius(&styles->focused, LV_DPX(3));
 
     lv_style_init(&styles->label);
     lv_style_set_text_font(&styles->label, ui->font.body);
+    lv_style_set_text_color(&styles->label, text_color);
 
     lv_style_init(&styles->btn);
-    lv_style_set_pad_all(&styles->btn, LV_DPX(10));
-    lv_style_set_bg_color(&styles->btn, lv_color_white());
-    lv_style_set_bg_opa(&styles->btn, LV_OPA_20);
+    lv_style_set_pad_all(&styles->btn, LV_DPX(12));
+    lv_style_set_radius(&styles->btn, LV_DPX(3));
+    lv_style_set_bg_color(&styles->btn, panel_color);
+    lv_style_set_bg_opa(&styles->btn, LV_OPA_COVER);
+    lv_style_set_border_width(&styles->btn, LV_DPX(1));
+    lv_style_set_border_color(&styles->btn, lv_color_hex(0x3d6a8a));
+    lv_style_set_border_opa(&styles->btn, LV_OPA_40);
+    lv_style_set_text_color(&styles->btn, text_color);
 
     lv_style_init(&styles->btn_focused);
     lv_style_set_bg_color(&styles->btn_focused, focus_color);
     lv_style_set_bg_opa(&styles->btn_focused, LV_OPA_COVER);
+    lv_style_set_border_color(&styles->btn_focused, accent_color);
+    lv_style_set_border_opa(&styles->btn_focused, LV_OPA_COVER);
+    lv_style_set_text_color(&styles->btn_focused, lv_color_white());
+    lv_style_set_shadow_width(&styles->btn_focused, LV_DPX(16));
+    lv_style_set_shadow_color(&styles->btn_focused, focus_color);
+    lv_style_set_shadow_opa(&styles->btn_focused, LV_OPA_40);
 
     lv_style_init(&styles->btn_pressed);
     lv_style_set_bg_color(&styles->btn_pressed, lv_color_darken(focus_color, LV_OPA_20));
@@ -110,13 +144,16 @@ void app_theme_init(lv_theme_t *theme, app_ui_t *ui) {
     lv_style_set_text_line_space(&styles->dropdown_list, LV_DPX(20));
 
     lv_style_init(&styles->modal_bg);
-    lv_style_set_bg_color(&styles->modal_bg, lv_color_hex(0x25282e));
+    lv_style_set_bg_color(&styles->modal_bg, lv_color_hex(STEAM_BG_DEEP));
     lv_style_set_bg_opa(&styles->modal_bg, LV_OPA_COVER);
+    lv_style_set_border_width(&styles->modal_bg, LV_DPX(1));
+    lv_style_set_border_color(&styles->modal_bg, panel_color);
+    lv_style_set_border_opa(&styles->modal_bg, LV_OPA_COVER);
     lv_style_set_shadow_color(&styles->modal_bg, lv_color_black());
-    lv_style_set_shadow_opa(&styles->modal_bg, LV_OPA_30);
-    lv_style_set_shadow_width(&styles->modal_bg, LV_DPX(20));
-    lv_style_set_shadow_ofs_y(&styles->modal_bg, LV_DPX(10));
-    lv_style_set_radius(&styles->modal_bg, LV_DPX(5));
+    lv_style_set_shadow_opa(&styles->modal_bg, LV_OPA_50);
+    lv_style_set_shadow_width(&styles->modal_bg, LV_DPX(24));
+    lv_style_set_shadow_ofs_y(&styles->modal_bg, LV_DPX(12));
+    lv_style_set_radius(&styles->modal_bg, LV_DPX(4));
     lv_style_set_min_width(&styles->modal_bg, LV_DPX(480));
     lv_style_set_max_width(&styles->modal_bg, LV_DPX(576));
 
@@ -128,15 +165,17 @@ void app_theme_init(lv_theme_t *theme, app_ui_t *ui) {
 
     lv_style_init(&styles->msgbox_backdrop);
     lv_style_set_bg_color(&styles->msgbox_backdrop, lv_color_black());
-    lv_style_set_bg_opa(&styles->msgbox_backdrop, LV_OPA_30);
+    lv_style_set_bg_opa(&styles->msgbox_backdrop, LV_OPA_50);
 
     lv_style_init(&styles->msgbox_title);
     lv_style_set_text_font(&styles->msgbox_title, ui->font.heading2);
+    lv_style_set_text_color(&styles->msgbox_title, accent_color);
     lv_style_set_text_letter_space(&styles->msgbox_title, LV_DPX(1));
     lv_style_set_pad_hor(&styles->msgbox_title, LV_DPX(16));
 
     lv_style_init(&styles->msgbox_text);
     lv_style_set_text_font(&styles->msgbox_text, ui->font.body);
+    lv_style_set_text_color(&styles->msgbox_text, text_color);
     lv_style_set_pad_top(&styles->msgbox_text, LV_DPX(8));
     lv_style_set_pad_hor(&styles->msgbox_text, LV_DPX(16));
     lv_style_set_pad_bottom(&styles->msgbox_text, LV_DPX(16));
@@ -149,37 +188,48 @@ void app_theme_init(lv_theme_t *theme, app_ui_t *ui) {
     lv_style_set_text_color(&styles->msgbox_btns_item, accent_color);
 
     lv_style_init(&styles->msgbox_btns_item_focused);
-    lv_style_set_bg_color(&styles->msgbox_btns_item_focused, primary_color);
-    lv_style_set_bg_opa(&styles->msgbox_btns_item_focused, LV_OPA_10);
+    lv_style_set_bg_color(&styles->msgbox_btns_item_focused, focus_color);
+    lv_style_set_bg_opa(&styles->msgbox_btns_item_focused, LV_OPA_COVER);
+    lv_style_set_text_color(&styles->msgbox_btns_item_focused, lv_color_white());
 
     lv_style_init(&styles->msgbox_btns_item_pressed);
-    lv_style_set_bg_color(&styles->msgbox_btns_item_pressed, primary_color);
-    lv_style_set_bg_opa(&styles->msgbox_btns_item_pressed, LV_OPA_20);
+    lv_style_set_bg_color(&styles->msgbox_btns_item_pressed, lv_color_darken(focus_color, LV_OPA_20));
+    lv_style_set_bg_opa(&styles->msgbox_btns_item_pressed, LV_OPA_COVER);
 
     lv_style_init(&styles->win_title);
     lv_style_set_text_font(&styles->win_title, ui->font.heading2);
+    lv_style_set_text_color(&styles->win_title, lv_color_white());
+    lv_style_set_text_letter_space(&styles->win_title, LV_DPX(2));
 
     lv_style_init(&styles->win_btn);
     lv_style_set_text_font(&styles->win_btn, ui->iconfont.heading3);
-    lv_style_set_radius(&styles->win_btn, LV_RADIUS_CIRCLE);
+    lv_style_set_radius(&styles->win_btn, LV_DPX(3));
     lv_style_set_min_height(&styles->win_btn, LV_DPX(40));
     lv_style_set_max_height(&styles->win_btn, LV_DPX(40));
+    lv_style_set_bg_color(&styles->win_btn, lv_color_hex(STEAM_BG_DEEP));
+    lv_style_set_bg_opa(&styles->win_btn, LV_OPA_60);
 
     lv_style_init(&styles->win_header);
-    lv_style_set_min_height(&styles->win_header, LV_DPX(60));
-    lv_style_set_pad_hor(&styles->win_header, LV_DPX(30));
-    lv_style_set_pad_top(&styles->win_header, LV_DPX(20));
-    lv_style_set_pad_bottom(&styles->win_header, LV_DPX(10));
+    lv_style_set_min_height(&styles->win_header, LV_DPX(64));
+    lv_style_set_pad_hor(&styles->win_header, LV_DPX(32));
+    lv_style_set_pad_top(&styles->win_header, LV_DPX(18));
+    lv_style_set_pad_bottom(&styles->win_header, LV_DPX(12));
+    lv_style_set_bg_color(&styles->win_header, lv_color_hex(STEAM_BG_DEEP));
+    lv_style_set_bg_opa(&styles->win_header, LV_OPA_80);
+    lv_style_set_border_side(&styles->win_header, LV_BORDER_SIDE_BOTTOM);
+    lv_style_set_border_width(&styles->win_header, LV_DPX(1));
+    lv_style_set_border_color(&styles->win_header, lv_color_hex(0x000000));
+    lv_style_set_border_opa(&styles->win_header, LV_OPA_40);
 
     lv_style_init(&styles->win_content);
-    lv_style_set_pad_hor(&styles->win_content, LV_DPX(30));
-    lv_style_set_pad_top(&styles->win_content, LV_DPX(10));
-    lv_style_set_pad_bottom(&styles->win_content, LV_DPX(15));
+    lv_style_set_pad_hor(&styles->win_content, LV_DPX(32));
+    lv_style_set_pad_top(&styles->win_content, LV_DPX(16));
+    lv_style_set_pad_bottom(&styles->win_content, LV_DPX(20));
 
     lv_style_init(&styles->arc_indic);
-    lv_style_set_arc_color(&styles->arc_indic, lv_color_lighten(accent_color, LV_OPA_80));
-    lv_style_set_arc_opa(&styles->arc_indic, LV_OPA_20);
-    lv_style_set_arc_width(&styles->arc_indic, LV_DPX(15));
+    lv_style_set_arc_color(&styles->arc_indic, panel_color);
+    lv_style_set_arc_opa(&styles->arc_indic, LV_OPA_COVER);
+    lv_style_set_arc_width(&styles->arc_indic, LV_DPX(12));
     lv_style_set_arc_rounded(&styles->arc_indic, true);
 
     lv_style_init(&styles->arc_indic_primary);
@@ -245,8 +295,8 @@ lv_obj_t *app_lv_win_create(lv_obj_t *parent) {
 
 #if IHSPLAY_WIP_FEATURES
     lv_obj_t *footer = lv_obj_create(win);
-    lv_obj_set_style_bg_opa(footer, LV_OPA_30, 0);
-    lv_obj_set_style_bg_color(footer, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(footer, LV_OPA_60, 0);
+    lv_obj_set_style_bg_color(footer, lv_color_hex(STEAM_BG_DEEP), 0);
     lv_obj_set_style_pad_hor(footer, lv_obj_get_style_pad_left(header, 0), 0);
     lv_obj_set_size(footer, LV_PCT(100), LV_DPX(40));
     lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);

@@ -1,0 +1,198 @@
+#include "stream_pin_fragment.h"
+
+#include "ui/app_ui.h"
+#include "connection_fragment.h"
+
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
+
+typedef struct stream_pin_fragment_t {
+    lv_fragment_t base;
+    app_t *app;
+    char pin[5];
+    int cursor;
+    lv_obj_t *pin_label;
+    lv_group_t *group;
+} stream_pin_fragment_t;
+
+static void ctor(lv_fragment_t *self, void *arg);
+
+static void dtor(lv_fragment_t *self);
+
+static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container);
+
+static void obj_created(lv_fragment_t *self, lv_obj_t *obj);
+
+static void obj_will_delete(lv_fragment_t *self, lv_obj_t *obj);
+
+static void refresh_pin_label(stream_pin_fragment_t *fragment);
+
+static void digit_clicked(lv_event_t *e);
+
+static void backspace_clicked(lv_event_t *e);
+
+static void submit_clicked(lv_event_t *e);
+
+static void cancel_clicked(lv_event_t *e);
+
+const lv_fragment_class_t stream_pin_fragment_class = {
+        .constructor_cb = ctor,
+        .destructor_cb = dtor,
+        .create_obj_cb = create_obj,
+        .obj_created_cb = obj_created,
+        .obj_will_delete_cb = obj_will_delete,
+        .instance_size = sizeof(stream_pin_fragment_t)
+};
+
+static void ctor(lv_fragment_t *self, void *arg) {
+    stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
+    app_ui_fragment_args_t *args = arg;
+    fragment->app = args->app;
+    memset(fragment->pin, 0, sizeof(fragment->pin));
+    fragment->cursor = 0;
+}
+
+static void dtor(lv_fragment_t *self) {
+    (void) self;
+}
+
+static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
+    stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
+    lv_obj_t *obj = lv_obj_create(container);
+    lv_obj_set_style_pad_gap(obj, LV_DPX(12), 0);
+    lv_obj_set_flex_flow(obj, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(obj, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+
+    lv_obj_t *hint = lv_label_create(obj);
+    lv_label_set_text(hint, "Enter the PIN shown on your Steam PC");
+    lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
+
+    fragment->pin_label = lv_label_create(obj);
+    lv_obj_set_style_text_font(fragment->pin_label, fragment->app->ui->font.huge, 0);
+    refresh_pin_label(fragment);
+
+    lv_obj_t *pad = lv_obj_create(obj);
+    lv_obj_set_size(pad, LV_DPX(360), LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_gap(pad, LV_DPX(8), 0);
+    lv_obj_set_style_bg_opa(pad, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(pad, 0, 0);
+    lv_obj_set_flex_flow(pad, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(pad, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    fragment->group = lv_group_create();
+    lv_group_set_wrap(fragment->group, true);
+
+    static const char *digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", NULL};
+    for (int i = 0; digits[i] != NULL; i++) {
+        lv_obj_t *btn = lv_btn_create(pad);
+        lv_obj_set_size(btn, LV_DPX(72), LV_DPX(56));
+        lv_obj_t *label = lv_label_create(btn);
+        lv_label_set_text(label, digits[i]);
+        lv_obj_center(label);
+        lv_obj_add_event_cb(btn, digit_clicked, LV_EVENT_CLICKED, fragment);
+        lv_obj_set_user_data(btn, (void *) (intptr_t) (digits[i][0]));
+        lv_group_add_obj(fragment->group, btn);
+    }
+
+    lv_obj_t *actions = lv_obj_create(obj);
+    lv_obj_set_size(actions, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_gap(actions, LV_DPX(12), 0);
+    lv_obj_set_style_bg_opa(actions, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(actions, 0, 0);
+    lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW);
+
+    lv_obj_t *backspace = lv_btn_create(actions);
+    lv_obj_t *backspace_label = lv_label_create(backspace);
+    lv_label_set_text(backspace_label, "Delete");
+    lv_obj_center(backspace_label);
+    lv_obj_add_event_cb(backspace, backspace_clicked, LV_EVENT_CLICKED, fragment);
+    lv_group_add_obj(fragment->group, backspace);
+
+    lv_obj_t *submit = lv_btn_create(actions);
+    lv_obj_t *submit_label = lv_label_create(submit);
+    lv_label_set_text(submit_label, "Connect");
+    lv_obj_center(submit_label);
+    lv_obj_add_event_cb(submit, submit_clicked, LV_EVENT_CLICKED, fragment);
+    lv_group_add_obj(fragment->group, submit);
+
+    lv_obj_t *cancel = lv_btn_create(actions);
+    lv_obj_t *cancel_label = lv_label_create(cancel);
+    lv_label_set_text(cancel_label, "Cancel");
+    lv_obj_center(cancel_label);
+    lv_obj_add_event_cb(cancel, cancel_clicked, LV_EVENT_CLICKED, fragment);
+    lv_group_add_obj(fragment->group, cancel);
+
+    return obj;
+}
+
+static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
+    (void) obj;
+    stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
+    lv_fragment_t *parent = lv_fragment_get_parent(self);
+    connection_fragment_set_title(parent, "Streaming PIN");
+    lv_indev_t *indev = lv_indev_get_next(NULL);
+    while (indev) {
+        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_KEYPAD) {
+            lv_indev_set_group(indev, fragment->group);
+            break;
+        }
+        indev = lv_indev_get_next(indev);
+    }
+}
+
+static void obj_will_delete(lv_fragment_t *self, lv_obj_t *obj) {
+    (void) obj;
+    stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
+    if (fragment->group != NULL) {
+        lv_group_del(fragment->group);
+        fragment->group = NULL;
+    }
+}
+
+static void refresh_pin_label(stream_pin_fragment_t *fragment) {
+    char display[8];
+    memset(display, '_', 4);
+    display[4] = '\0';
+    for (int i = 0; i < fragment->cursor && i < 4; i++) {
+        display[i] = fragment->pin[i];
+    }
+    lv_label_set_text(fragment->pin_label, display);
+}
+
+static void digit_clicked(lv_event_t *e) {
+    stream_pin_fragment_t *fragment = lv_event_get_user_data(e);
+    if (fragment->cursor >= 4) {
+        return;
+    }
+    char digit = (char) (intptr_t) lv_obj_get_user_data(lv_event_get_current_target(e));
+    fragment->pin[fragment->cursor++] = digit;
+    fragment->pin[fragment->cursor] = '\0';
+    refresh_pin_label(fragment);
+}
+
+static void backspace_clicked(lv_event_t *e) {
+    stream_pin_fragment_t *fragment = lv_event_get_user_data(e);
+    if (fragment->cursor <= 0) {
+        return;
+    }
+    fragment->pin[--fragment->cursor] = '\0';
+    refresh_pin_label(fragment);
+}
+
+static void submit_clicked(lv_event_t *e) {
+    stream_pin_fragment_t *fragment = lv_event_get_user_data(e);
+    if (fragment->cursor < 4) {
+        return;
+    }
+    lv_fragment_t *parent = lv_fragment_get_parent((lv_fragment_t *) fragment);
+    connection_fragment_submit_stream_pin(parent, fragment->pin);
+}
+
+static void cancel_clicked(lv_event_t *e) {
+    stream_pin_fragment_t *fragment = lv_event_get_user_data(e);
+    lv_fragment_t *parent = lv_fragment_get_parent((lv_fragment_t *) fragment);
+    connection_fragment_cancel(parent);
+}

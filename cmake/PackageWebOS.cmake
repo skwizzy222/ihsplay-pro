@@ -5,7 +5,7 @@ else ()
     message(FATAL_ERROR "Unknown build architecture inferred from C compiler ${CMAKE_C_COMPILER_NAME}")
 endif ()
 
-set(CPACK_PACKAGE_NAME "org.mariotaku.ihsplay")
+set(CPACK_PACKAGE_NAME "org.ihsplay.pro")
 set(CPACK_GENERATOR "External")
 set(CPACK_EXTERNAL_PACKAGE_SCRIPT "${CMAKE_SOURCE_DIR}/cmake/AresPackage.cmake")
 set(CPACK_EXTERNAL_ENABLE_STAGING TRUE)

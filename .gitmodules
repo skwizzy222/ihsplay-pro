@@ -3,7 +3,8 @@
 	url = https://github.com/lvgl/lvgl.git
 [submodule "third_party/ihslib"]
 	path = core
-	url = https://github.com/mariotaku/ihslib.git
+	url = https://github.com/skwizzy222/ihslib.git
+	branch = main
 [submodule "cmake/sanitizers"]
 	path = cmake/sanitizers
 	url = https://github.com/arsenm/sanitizers-cmake.git
@@ -12,4 +13,5 @@
 	url = https://github.com/mariotaku/ss4s.git
 [submodule "third_party/commons"]
 	path = third_party/commons
-	url = https://github.com/mariotaku/commons-c.git
+	url = https://github.com/skwizzy222/commons-c.git
+	branch = main

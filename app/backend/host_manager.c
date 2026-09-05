@@ -9,6 +9,8 @@
 #include "ui/common/error_messages.h"
 #include "logging.h"
 
+#include <string.h>
+
 struct host_manager_t {
     app_t *app;
     IHS_Client *client;
@@ -102,11 +104,22 @@ void host_manager_discovery_stop(host_manager_t *manager) {
     IHS_ClientStopDiscovery(manager->client);
 }
 
+bool host_manager_discover_at(host_manager_t *manager, const char *ip) {
+    IHS_IPAddress address;
+    if (!IHS_IPAddressFromString(&address, ip)) {
+        commons_log_error("Hosts", "Invalid IP address: %s", ip);
+        return false;
+    }
+    // Keep broadcast discovery running while probing a specific host.
+    host_manager_discovery_start(manager);
+    return IHS_ClientDiscoverAt(manager->client, &address);
+}
+
 array_list_t *host_manager_get_hosts(host_manager_t *manager) {
     return manager->hosts;
 }
 
-void host_manager_session_request(host_manager_t *manager, const IHS_HostInfo *host) {
+static void session_request_internal(host_manager_t *manager, const IHS_HostInfo *host, const char *pin) {
     IHS_StreamingRequest request = {
             .audioChannelCount = 2,
             .streamingEnable.audio = true,
@@ -114,8 +127,25 @@ void host_manager_session_request(host_manager_t *manager, const IHS_HostInfo *h
             .streamingEnable.input = true,
             .maxResolution.x = 1920,
             .maxResolution.y = 1080,
+            .streamingInterface = IHS_StreamInterfaceDesktop,
     };
+    if (pin != NULL && pin[0] != '\0') {
+        strncpy(request.pin, pin, sizeof(request.pin) - 1);
+        request.pin[sizeof(request.pin) - 1] = '\0';
+    }
     IHS_ClientStreamingRequest(manager->client, host, &request);
+}
+
+void host_manager_session_request(host_manager_t *manager, const IHS_HostInfo *host) {
+    session_request_internal(manager, host, NULL);
+}
+
+void host_manager_session_request_with_pin(host_manager_t *manager, const IHS_HostInfo *host, const char *pin) {
+    session_request_internal(manager, host, pin);
+}
+
+bool host_manager_session_cancel(host_manager_t *manager) {
+    return IHS_ClientStreamingCancel(manager->client);
 }
 
 void host_manager_register_listener(host_manager_t *manager, const host_manager_listener_t *listener, void *context) {
