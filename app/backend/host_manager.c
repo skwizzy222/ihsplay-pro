@@ -125,8 +125,8 @@ static void session_request_internal(host_manager_t *manager, const IHS_HostInfo
             .streamingEnable.audio = true,
             .streamingEnable.video = true,
             .streamingEnable.input = true,
-            .maxResolution.x = 1920,
-            .maxResolution.y = 1080,
+            .maxResolution.x = 1280,
+            .maxResolution.y = 720,
             .streamingInterface = IHS_StreamInterfaceDesktop,
     };
     if (pin != NULL && pin[0] != '\0') {

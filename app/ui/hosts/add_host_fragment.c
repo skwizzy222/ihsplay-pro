@@ -20,6 +20,7 @@ typedef struct add_host_fragment_t {
     lv_obj_t *dot_btn;
     lv_obj_t *delete_btn;
     lv_obj_t *find_btn;
+    lv_obj_t *back_btn;
 } add_host_fragment_t;
 
 static void ctor(lv_fragment_t *self, void *arg);
@@ -43,6 +44,8 @@ static void dot_clicked(lv_event_t *e);
 static void backspace_clicked(lv_event_t *e);
 
 static void connect_clicked(lv_event_t *e);
+
+static void nav_back_clicked(lv_event_t *e);
 
 static void keypad_key(lv_event_t *e);
 
@@ -145,6 +148,14 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_add_event_cb(fragment->find_btn, keypad_key, LV_EVENT_KEY, NULL);
     lv_group_add_obj(fragment->group, fragment->find_btn);
 
+    fragment->back_btn = lv_btn_create(actions);
+    lv_obj_t *back_label = lv_label_create(fragment->back_btn);
+    lv_label_set_text(back_label, "Back");
+    lv_obj_center(back_label);
+    lv_obj_add_event_cb(fragment->back_btn, nav_back_clicked, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(fragment->back_btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(fragment->group, fragment->back_btn);
+
     wire_dir_focus(fragment);
     return win;
 }
@@ -182,6 +193,9 @@ static void wire_dir_focus(add_host_fragment_t *fragment) {
     lv_obj_set_dir_focus_obj(fragment->delete_btn, LV_DIR_RIGHT, fragment->find_btn);
     lv_obj_set_dir_focus_obj(fragment->find_btn, LV_DIR_TOP, fragment->dot_btn);
     lv_obj_set_dir_focus_obj(fragment->find_btn, LV_DIR_LEFT, fragment->delete_btn);
+    lv_obj_set_dir_focus_obj(fragment->find_btn, LV_DIR_RIGHT, fragment->back_btn);
+    lv_obj_set_dir_focus_obj(fragment->back_btn, LV_DIR_TOP, fragment->dot_btn);
+    lv_obj_set_dir_focus_obj(fragment->back_btn, LV_DIR_LEFT, fragment->find_btn);
 }
 
 static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
@@ -212,7 +226,14 @@ static bool event_cb(lv_fragment_t *self, int code, void *data) {
 }
 
 static void keypad_key(lv_event_t *e) {
-    lv_obj_focus_dir_by_key(lv_event_get_target(e), lv_event_get_key(e));
+    lv_key_t key = lv_event_get_key(e);
+    if (key == LV_KEY_ESC) {
+        add_host_fragment_t *fragment = NULL;
+        /* ESC handled globally via APP_UI_NAV_BACK */
+        (void) fragment;
+        return;
+    }
+    lv_obj_focus_dir_by_key(lv_event_get_target(e), key);
 }
 
 static void refresh_ip_label(add_host_fragment_t *fragment) {
@@ -262,5 +283,10 @@ static void connect_clicked(lv_event_t *e) {
         return;
     }
     lv_label_set_text(fragment->status_label, "Looking for Steam PC…");
+    app_ui_pop_top_fragment(fragment->app->ui);
+}
+
+static void nav_back_clicked(lv_event_t *e) {
+    add_host_fragment_t *fragment = lv_event_get_user_data(e);
     app_ui_pop_top_fragment(fragment->app->ui);
 }
