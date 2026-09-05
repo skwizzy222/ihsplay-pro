@@ -36,7 +36,8 @@ static int video_start(IHS_Session *session, const IHS_StreamVideoConfig *config
 
 static void video_stop(IHS_Session *session, void *context);
 
-static int video_submit(IHS_Session *session, IHS_Buffer *data, IHS_StreamVideoFrameFlag flags, void *context);
+static IHS_StreamVideoSubmitResult video_submit(IHS_Session *session, IHS_Buffer *data, IHS_StreamVideoFrameFlag flags,
+                                                void *context);
 
 static int video_set_capture_size(IHS_Session *session, int width, int height, void *context);
 
@@ -111,7 +112,13 @@ void stream_media_set_overlay_shown(stream_media_session_t *media_session, bool 
 }
 
 bool stream_media_supports_hevc(stream_media_session_t *media_session) {
+#if defined(__WEBOS__)
+    /* H.265 on webOS/Starfish often freezes while audio continues; prefer H.264. */
+    (void) media_session;
+    return false;
+#else
     return media_session->video_cap.codecs & SS4S_VIDEO_H265;
+#endif
 }
 
 const IHS_StreamAudioCallbacks *stream_media_audio_callbacks() {
@@ -214,7 +221,8 @@ static void video_stop(IHS_Session *session, void *context) {
     SS4S_PlayerVideoClose(media_session->player);
 }
 
-static int video_submit(IHS_Session *session, IHS_Buffer *data, IHS_StreamVideoFrameFlag flags, void *context) {
+static IHS_StreamVideoSubmitResult video_submit(IHS_Session *session, IHS_Buffer *data, IHS_StreamVideoFrameFlag flags,
+                                                void *context) {
     (void) session;
     stream_media_session_t *media_session = (stream_media_session_t *) context;
     SS4S_VideoFeedFlags sflgs = 0;
@@ -253,7 +261,26 @@ static int video_submit(IHS_Session *session, IHS_Buffer *data, IHS_StreamVideoF
         }
         SDL_UnlockMutex(media_session->lock);
     }
-    return SS4S_PlayerVideoFeed(media_session->player, data->data + data->offset, data->size, sflgs);
+    SS4S_VideoFeedResult feed = SS4S_PlayerVideoFeed(media_session->player, data->data + data->offset, data->size,
+                                                     sflgs);
+    /*
+     * Map SS4S feed codes to ihslib submit results.
+     * REQUEST_KEYFRAME is 2 — previously returned raw and was ignored, so the
+     * decoder could freeze forever while audio kept playing.
+     */
+    switch (feed) {
+        case SS4S_VIDEO_FEED_OK:
+            return IHS_StreamVideoSubmitOK;
+        case SS4S_VIDEO_FEED_NOT_READY:
+            return IHS_StreamVideoSubmitOK;
+        case SS4S_VIDEO_FEED_REQUEST_KEYFRAME:
+            commons_log_warn("Media", "Decoder requested keyframe");
+            return IHS_StreamVideoSubmitReportLost;
+        case SS4S_VIDEO_FEED_ERROR:
+        default:
+            commons_log_error("Media", "Video feed error %d, requesting keyframe", (int) feed);
+            return IHS_StreamVideoSubmitReportLost;
+    }
 }
 
 static int video_set_capture_size(IHS_Session *session, int width, int height, void *context) {
