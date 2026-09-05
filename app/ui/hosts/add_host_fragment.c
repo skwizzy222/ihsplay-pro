@@ -4,6 +4,7 @@
 #include "backend/host_manager.h"
 #include "ui/app_ui.h"
 #include "lvgl/theme.h"
+#include "lvgl/ext/lv_dir_focus.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -15,6 +16,10 @@ typedef struct add_host_fragment_t {
     lv_obj_t *ip_label;
     lv_obj_t *status_label;
     lv_group_t *group;
+    lv_obj_t *digit_btns[10];
+    lv_obj_t *dot_btn;
+    lv_obj_t *delete_btn;
+    lv_obj_t *find_btn;
 } add_host_fragment_t;
 
 static void ctor(lv_fragment_t *self, void *arg);
@@ -39,6 +44,10 @@ static void backspace_clicked(lv_event_t *e);
 
 static void connect_clicked(lv_event_t *e);
 
+static void keypad_key(lv_event_t *e);
+
+static void wire_dir_focus(add_host_fragment_t *fragment);
+
 const lv_fragment_class_t add_host_fragment_class = {
         .constructor_cb = ctor,
         .destructor_cb = dtor,
@@ -48,6 +57,19 @@ const lv_fragment_class_t add_host_fragment_class = {
         .event_cb = event_cb,
         .instance_size = sizeof(add_host_fragment_t)
 };
+
+static lv_obj_t *make_pad_btn(lv_obj_t *parent, lv_group_t *group, const char *text,
+                              lv_event_cb_t cb, void *user_data) {
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_size(btn, LV_DPX(72), LV_DPX(56));
+    lv_obj_t *label = lv_label_create(btn);
+    lv_label_set_text(label, text);
+    lv_obj_center(label);
+    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
+    lv_obj_add_event_cb(btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(group, btn);
+    return btn;
+}
 
 static void ctor(lv_fragment_t *self, void *arg) {
     add_host_fragment_t *fragment = (add_host_fragment_t *) self;
@@ -92,25 +114,13 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->group = lv_group_create();
     lv_group_set_wrap(fragment->group, true);
 
-    static const char *digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", NULL};
-    for (int i = 0; digits[i] != NULL; i++) {
-        lv_obj_t *btn = lv_btn_create(pad);
-        lv_obj_set_size(btn, LV_DPX(72), LV_DPX(56));
-        lv_obj_t *label = lv_label_create(btn);
-        lv_label_set_text(label, digits[i]);
-        lv_obj_center(label);
-        lv_obj_add_event_cb(btn, digit_clicked, LV_EVENT_CLICKED, fragment);
-        lv_obj_set_user_data(btn, (void *) (intptr_t) (digits[i][0]));
-        lv_group_add_obj(fragment->group, btn);
+    static const char *digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+    for (int i = 0; i < 10; i++) {
+        fragment->digit_btns[i] = make_pad_btn(pad, fragment->group, digits[i], digit_clicked, fragment);
+        lv_obj_set_user_data(fragment->digit_btns[i], (void *) (intptr_t) digits[i][0]);
     }
 
-    lv_obj_t *dot = lv_btn_create(pad);
-    lv_obj_set_size(dot, LV_DPX(72), LV_DPX(56));
-    lv_obj_t *dot_label = lv_label_create(dot);
-    lv_label_set_text(dot_label, ".");
-    lv_obj_center(dot_label);
-    lv_obj_add_event_cb(dot, dot_clicked, LV_EVENT_CLICKED, fragment);
-    lv_group_add_obj(fragment->group, dot);
+    fragment->dot_btn = make_pad_btn(pad, fragment->group, ".", dot_clicked, fragment);
 
     lv_obj_t *actions = lv_obj_create(content);
     lv_obj_set_size(actions, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -119,40 +129,73 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_border_width(actions, 0, 0);
     lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW);
 
-    lv_obj_t *backspace = lv_btn_create(actions);
-    lv_obj_t *backspace_label = lv_label_create(backspace);
+    fragment->delete_btn = lv_btn_create(actions);
+    lv_obj_t *backspace_label = lv_label_create(fragment->delete_btn);
     lv_label_set_text(backspace_label, "Delete");
     lv_obj_center(backspace_label);
-    lv_obj_add_event_cb(backspace, backspace_clicked, LV_EVENT_CLICKED, fragment);
-    lv_group_add_obj(fragment->group, backspace);
+    lv_obj_add_event_cb(fragment->delete_btn, backspace_clicked, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(fragment->delete_btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(fragment->group, fragment->delete_btn);
 
-    lv_obj_t *connect = lv_btn_create(actions);
-    lv_obj_t *connect_label = lv_label_create(connect);
+    fragment->find_btn = lv_btn_create(actions);
+    lv_obj_t *connect_label = lv_label_create(fragment->find_btn);
     lv_label_set_text(connect_label, "Find PC");
     lv_obj_center(connect_label);
-    lv_obj_add_event_cb(connect, connect_clicked, LV_EVENT_CLICKED, fragment);
-    lv_group_add_obj(fragment->group, connect);
+    lv_obj_add_event_cb(fragment->find_btn, connect_clicked, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(fragment->find_btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(fragment->group, fragment->find_btn);
 
+    wire_dir_focus(fragment);
     return win;
+}
+
+static void wire_dir_focus(add_host_fragment_t *fragment) {
+    lv_obj_t **d = fragment->digit_btns;
+    /* Row 1: 1 2 3 4 5 */
+    for (int i = 0; i < 5; i++) {
+        if (i > 0) {
+            lv_obj_set_dir_focus_obj(d[i], LV_DIR_LEFT, d[i - 1]);
+        }
+        if (i < 4) {
+            lv_obj_set_dir_focus_obj(d[i], LV_DIR_RIGHT, d[i + 1]);
+        }
+        lv_obj_set_dir_focus_obj(d[i], LV_DIR_BOTTOM, d[i + 5]);
+    }
+    /* Row 2: 6 7 8 9 0 */
+    for (int i = 5; i < 10; i++) {
+        if (i > 5) {
+            lv_obj_set_dir_focus_obj(d[i], LV_DIR_LEFT, d[i - 1]);
+        }
+        if (i < 9) {
+            lv_obj_set_dir_focus_obj(d[i], LV_DIR_RIGHT, d[i + 1]);
+        }
+        lv_obj_set_dir_focus_obj(d[i], LV_DIR_TOP, d[i - 5]);
+        lv_obj_set_dir_focus_obj(d[i], LV_DIR_BOTTOM, fragment->dot_btn);
+    }
+    /* Dot */
+    lv_obj_set_dir_focus_obj(fragment->dot_btn, LV_DIR_TOP, d[7]);
+    lv_obj_set_dir_focus_obj(fragment->dot_btn, LV_DIR_BOTTOM, fragment->delete_btn);
+    lv_obj_set_dir_focus_obj(fragment->dot_btn, LV_DIR_LEFT, d[5]);
+    lv_obj_set_dir_focus_obj(fragment->dot_btn, LV_DIR_RIGHT, d[9]);
+    /* Actions */
+    lv_obj_set_dir_focus_obj(fragment->delete_btn, LV_DIR_TOP, fragment->dot_btn);
+    lv_obj_set_dir_focus_obj(fragment->delete_btn, LV_DIR_RIGHT, fragment->find_btn);
+    lv_obj_set_dir_focus_obj(fragment->find_btn, LV_DIR_TOP, fragment->dot_btn);
+    lv_obj_set_dir_focus_obj(fragment->find_btn, LV_DIR_LEFT, fragment->delete_btn);
 }
 
 static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     (void) obj;
     add_host_fragment_t *fragment = (add_host_fragment_t *) self;
-    lv_indev_t *indev = lv_indev_get_next(NULL);
-    while (indev) {
-        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_KEYPAD) {
-            lv_indev_set_group(indev, fragment->group);
-            break;
-        }
-        indev = lv_indev_get_next(indev);
-    }
+    app_ui_push_modal_group(fragment->app->ui, fragment->group);
+    lv_group_focus_obj(fragment->digit_btns[0]);
 }
 
 static void obj_will_delete(lv_fragment_t *self, lv_obj_t *obj) {
     (void) obj;
     add_host_fragment_t *fragment = (add_host_fragment_t *) self;
     if (fragment->group != NULL) {
+        app_ui_remove_modal_group(fragment->app->ui, fragment->group);
         lv_group_del(fragment->group);
         fragment->group = NULL;
     }
@@ -168,9 +211,13 @@ static bool event_cb(lv_fragment_t *self, int code, void *data) {
     return false;
 }
 
+static void keypad_key(lv_event_t *e) {
+    lv_obj_focus_dir_by_key(lv_event_get_target(e), lv_event_get_key(e));
+}
+
 static void refresh_ip_label(add_host_fragment_t *fragment) {
     if (fragment->ip[0] == '\0') {
-        lv_label_set_text(fragment->ip_label, "_.__.__.__");
+        lv_label_set_text(fragment->ip_label, "___.___.___.___");
     } else {
         lv_label_set_text(fragment->ip_label, fragment->ip);
     }

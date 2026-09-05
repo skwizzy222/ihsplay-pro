@@ -2,6 +2,7 @@
 
 #include "ui/app_ui.h"
 #include "connection_fragment.h"
+#include "lvgl/ext/lv_dir_focus.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -14,7 +15,15 @@ typedef struct stream_pin_fragment_t {
     int cursor;
     lv_obj_t *pin_label;
     lv_group_t *group;
+    lv_obj_t *digit_btns[10];
+    lv_obj_t *delete_btn;
+    lv_obj_t *submit_btn;
+    lv_obj_t *cancel_btn;
 } stream_pin_fragment_t;
+
+static void keypad_key(lv_event_t *e);
+
+static void wire_dir_focus(stream_pin_fragment_t *fragment);
 
 static void ctor(lv_fragment_t *self, void *arg);
 
@@ -85,16 +94,18 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->group = lv_group_create();
     lv_group_set_wrap(fragment->group, true);
 
-    static const char *digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", NULL};
-    for (int i = 0; digits[i] != NULL; i++) {
+    static const char *digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"};
+    for (int i = 0; i < 10; i++) {
         lv_obj_t *btn = lv_btn_create(pad);
         lv_obj_set_size(btn, LV_DPX(72), LV_DPX(56));
         lv_obj_t *label = lv_label_create(btn);
         lv_label_set_text(label, digits[i]);
         lv_obj_center(label);
         lv_obj_add_event_cb(btn, digit_clicked, LV_EVENT_CLICKED, fragment);
-        lv_obj_set_user_data(btn, (void *) (intptr_t) (digits[i][0]));
+        lv_obj_add_event_cb(btn, keypad_key, LV_EVENT_KEY, NULL);
+        lv_obj_set_user_data(btn, (void *) (intptr_t) digits[i][0]);
         lv_group_add_obj(fragment->group, btn);
+        fragment->digit_btns[i] = btn;
     }
 
     lv_obj_t *actions = lv_obj_create(obj);
@@ -104,28 +115,58 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_border_width(actions, 0, 0);
     lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW);
 
-    lv_obj_t *backspace = lv_btn_create(actions);
-    lv_obj_t *backspace_label = lv_label_create(backspace);
+    fragment->delete_btn = lv_btn_create(actions);
+    lv_obj_t *backspace_label = lv_label_create(fragment->delete_btn);
     lv_label_set_text(backspace_label, "Delete");
     lv_obj_center(backspace_label);
-    lv_obj_add_event_cb(backspace, backspace_clicked, LV_EVENT_CLICKED, fragment);
-    lv_group_add_obj(fragment->group, backspace);
+    lv_obj_add_event_cb(fragment->delete_btn, backspace_clicked, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(fragment->delete_btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(fragment->group, fragment->delete_btn);
 
-    lv_obj_t *submit = lv_btn_create(actions);
-    lv_obj_t *submit_label = lv_label_create(submit);
+    fragment->submit_btn = lv_btn_create(actions);
+    lv_obj_t *submit_label = lv_label_create(fragment->submit_btn);
     lv_label_set_text(submit_label, "Connect");
     lv_obj_center(submit_label);
-    lv_obj_add_event_cb(submit, submit_clicked, LV_EVENT_CLICKED, fragment);
-    lv_group_add_obj(fragment->group, submit);
+    lv_obj_add_event_cb(fragment->submit_btn, submit_clicked, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(fragment->submit_btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(fragment->group, fragment->submit_btn);
 
-    lv_obj_t *cancel = lv_btn_create(actions);
-    lv_obj_t *cancel_label = lv_label_create(cancel);
+    fragment->cancel_btn = lv_btn_create(actions);
+    lv_obj_t *cancel_label = lv_label_create(fragment->cancel_btn);
     lv_label_set_text(cancel_label, "Cancel");
     lv_obj_center(cancel_label);
-    lv_obj_add_event_cb(cancel, cancel_clicked, LV_EVENT_CLICKED, fragment);
-    lv_group_add_obj(fragment->group, cancel);
+    lv_obj_add_event_cb(fragment->cancel_btn, cancel_clicked, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(fragment->cancel_btn, keypad_key, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(fragment->group, fragment->cancel_btn);
 
+    wire_dir_focus(fragment);
     return obj;
+}
+
+static void wire_dir_focus(stream_pin_fragment_t *fragment) {
+    lv_obj_t **d = fragment->digit_btns;
+    for (int i = 0; i < 5; i++) {
+        if (i > 0) lv_obj_set_dir_focus_obj(d[i], LV_DIR_LEFT, d[i - 1]);
+        if (i < 4) lv_obj_set_dir_focus_obj(d[i], LV_DIR_RIGHT, d[i + 1]);
+        lv_obj_set_dir_focus_obj(d[i], LV_DIR_BOTTOM, d[i + 5]);
+    }
+    for (int i = 5; i < 10; i++) {
+        if (i > 5) lv_obj_set_dir_focus_obj(d[i], LV_DIR_LEFT, d[i - 1]);
+        if (i < 9) lv_obj_set_dir_focus_obj(d[i], LV_DIR_RIGHT, d[i + 1]);
+        lv_obj_set_dir_focus_obj(d[i], LV_DIR_TOP, d[i - 5]);
+        lv_obj_set_dir_focus_obj(d[i], LV_DIR_BOTTOM, fragment->delete_btn);
+    }
+    lv_obj_set_dir_focus_obj(fragment->delete_btn, LV_DIR_TOP, d[7]);
+    lv_obj_set_dir_focus_obj(fragment->delete_btn, LV_DIR_RIGHT, fragment->submit_btn);
+    lv_obj_set_dir_focus_obj(fragment->submit_btn, LV_DIR_TOP, d[7]);
+    lv_obj_set_dir_focus_obj(fragment->submit_btn, LV_DIR_LEFT, fragment->delete_btn);
+    lv_obj_set_dir_focus_obj(fragment->submit_btn, LV_DIR_RIGHT, fragment->cancel_btn);
+    lv_obj_set_dir_focus_obj(fragment->cancel_btn, LV_DIR_TOP, d[9]);
+    lv_obj_set_dir_focus_obj(fragment->cancel_btn, LV_DIR_LEFT, fragment->submit_btn);
+}
+
+static void keypad_key(lv_event_t *e) {
+    lv_obj_focus_dir_by_key(lv_event_get_target(e), lv_event_get_key(e));
 }
 
 static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
@@ -133,20 +174,15 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
     lv_fragment_t *parent = lv_fragment_get_parent(self);
     connection_fragment_set_title(parent, "Streaming PIN");
-    lv_indev_t *indev = lv_indev_get_next(NULL);
-    while (indev) {
-        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_KEYPAD) {
-            lv_indev_set_group(indev, fragment->group);
-            break;
-        }
-        indev = lv_indev_get_next(indev);
-    }
+    app_ui_push_modal_group(fragment->app->ui, fragment->group);
+    lv_group_focus_obj(fragment->digit_btns[0]);
 }
 
 static void obj_will_delete(lv_fragment_t *self, lv_obj_t *obj) {
     (void) obj;
     stream_pin_fragment_t *fragment = (stream_pin_fragment_t *) self;
     if (fragment->group != NULL) {
+        app_ui_remove_modal_group(fragment->app->ui, fragment->group);
         lv_group_del(fragment->group);
         fragment->group = NULL;
     }
