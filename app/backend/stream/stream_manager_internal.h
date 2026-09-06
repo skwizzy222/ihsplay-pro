@@ -25,6 +25,15 @@ struct stream_manager_t {
     bool overlay_opened;
     bool requested_disconnect;
 
+    /* No-video watchdog → silent reconnect without leaving session UI */
+    SDL_TimerID watchdog_timer;
+    uint32_t last_video_frame_ms;
+    bool watchdog_reconnect;
+    int watchdog_attempts;
+    IHS_HostInfo reconnect_host;
+    IHS_StreamInterface reconnect_interface;
+    bool has_reconnect_target;
+
     int viewport_width, viewport_height;
     int capture_width, capture_height;
     int overlay_height;

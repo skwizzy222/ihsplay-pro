@@ -68,11 +68,20 @@ static void session_overlay_progress(int percentage, void *context);
 
 static void session_overlay_progress_finished(bool requested, void *context);
 
+static void host_session_started(const IHS_HostInfo *host, const IHS_SessionInfo *info, void *context);
+
+static void host_session_start_failed(const IHS_HostInfo *host, IHS_StreamingResult result, void *context);
+
 const static stream_manager_listener_t stream_manager_listener = {
         .connected = session_connected_main,
         .disconnected = session_disconnected_main,
         .overlay_progress = session_overlay_progress,
         .overlay_progress_finished = session_overlay_progress_finished,
+};
+
+const static host_manager_listener_t session_host_listener = {
+        .session_started = host_session_started,
+        .session_start_failed = host_session_start_failed,
 };
 
 
@@ -182,7 +191,9 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     lv_fragment_manager_replace(fragment->base.child_manager, fragment->overlay, &fragment->base.obj);
 
     stream_manager_t *stream_manager = fragment->app->stream_manager;
+    stream_manager_set_reconnect_target(stream_manager, &fragment->args.host, fragment->args.stream_interface);
     stream_manager_register_listener(stream_manager, &stream_manager_listener, fragment);
+    host_manager_register_listener(fragment->app->host_manager, &session_host_listener, fragment);
     if (fragment->args.session.sessionKeyLen > 0) {
         stream_manager_start_session(stream_manager, &fragment->args.session);
     }
@@ -198,6 +209,7 @@ static void obj_will_delete(lv_fragment_t *self, lv_obj_t *obj) {
     app_ui_set_ignore_keys(fragment->app->ui, false);
 
     stream_manager_unregister_listener(fragment->app->stream_manager, &stream_manager_listener);
+    host_manager_unregister_listener(fragment->app->host_manager, &session_host_listener);
 
     lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, 0);
 }
@@ -240,18 +252,59 @@ static void session_connected_main(const IHS_SessionInfo *info, void *context) {
         lv_fragment_manager_remove(fragment->base.child_manager, fragment->overlay);
         fragment->overlay = NULL;
     }
+    if (fragment->overlay_hint != NULL) {
+        lv_obj_t *label = lv_obj_get_child(fragment->overlay_hint, 0);
+        if (label != NULL) {
+            lv_label_set_text_static(label, "Удерживайте, чтобы открыть меню");
+        }
+        lv_obj_add_flag(fragment->overlay_hint, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 static void session_disconnected_main(const IHS_SessionInfo *info, bool requested, void *context) {
     LV_UNUSED(info);
     session_fragment_t *fragment = (session_fragment_t *) context;
-//    SDL_SetCursor(SDL_GetDefaultCursor());
+    if (stream_manager_is_reconnecting(fragment->app->stream_manager)) {
+        if (fragment->overlay_hint != NULL) {
+            lv_obj_t *label = lv_obj_get_child(fragment->overlay_hint, 0);
+            if (label != NULL) {
+                lv_label_set_text_static(label, "Нет картинки — переподключение…");
+            }
+            lv_obj_clear_flag(fragment->overlay_hint, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
     if (!requested) {
         static const char *btn_txts[] = {"OK", ""};
         lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, "Отключено.", btn_txts, false);
         lv_obj_add_event_cb(mbox, disconnected_dialog_cb, LV_EVENT_VALUE_CHANGED, NULL);
         lv_obj_center(mbox);
     }
+    app_ui_pop_top_fragment(fragment->app->ui);
+}
+
+static void host_session_started(const IHS_HostInfo *host, const IHS_SessionInfo *info, void *context) {
+    session_fragment_t *fragment = (session_fragment_t *) context;
+    if (!stream_manager_is_reconnecting(fragment->app->stream_manager)) {
+        return;
+    }
+    (void) host;
+    fragment->args.session = *info;
+    stream_manager_start_session(fragment->app->stream_manager, info);
+}
+
+static void host_session_start_failed(const IHS_HostInfo *host, IHS_StreamingResult result, void *context) {
+    (void) host;
+    (void) result;
+    session_fragment_t *fragment = (session_fragment_t *) context;
+    if (!stream_manager_is_reconnecting(fragment->app->stream_manager)) {
+        return;
+    }
+    stream_manager_clear_reconnect(fragment->app->stream_manager);
+    static const char *btn_txts[] = {"OK", ""};
+    lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, "Не удалось переподключиться.", btn_txts, false);
+    lv_obj_add_event_cb(mbox, disconnected_dialog_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_center(mbox);
     app_ui_pop_top_fragment(fragment->app->ui);
 }
 

@@ -131,6 +131,7 @@ static void session_started(const IHS_HostInfo *host, const IHS_SessionInfo *inf
     session_fragment_args_t args = {
             .host = *host,
             .session = *info,
+            .stream_interface = fragment->stream_interface,
     };
     app_ui_push_fragment(fragment->app->ui, &session_fragment_class, &args);
     app_ui_remove_fragment(fragment->app->ui, (lv_fragment_t *) fragment);

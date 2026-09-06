@@ -30,6 +30,15 @@ void stream_manager_unregister_listener(stream_manager_t *manager, const stream_
 
 bool stream_manager_start_session(stream_manager_t *manager, const IHS_SessionInfo *info);
 
+void stream_manager_set_reconnect_target(stream_manager_t *manager, const IHS_HostInfo *host,
+                                         IHS_StreamInterface stream_interface);
+
+void stream_manager_note_video_frame(stream_manager_t *manager);
+
+bool stream_manager_is_reconnecting(const stream_manager_t *manager);
+
+void stream_manager_clear_reconnect(stream_manager_t *manager);
+
 IHS_Session *stream_manager_active_session(const stream_manager_t *manager);
 
 void stream_manager_stop_active(stream_manager_t *manager);

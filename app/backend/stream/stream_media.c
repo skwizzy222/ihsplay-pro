@@ -288,6 +288,7 @@ static IHS_StreamVideoSubmitResult video_submit(IHS_Session *session, IHS_Buffer
      */
     switch (feed) {
         case SS4S_VIDEO_FEED_OK:
+            stream_manager_note_video_frame(media_session->manager);
             return IHS_StreamVideoSubmitOK;
         case SS4S_VIDEO_FEED_NOT_READY:
             return IHS_StreamVideoSubmitOK;

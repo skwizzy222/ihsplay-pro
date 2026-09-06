@@ -6,6 +6,7 @@
 typedef struct session_fragment_args_t {
     IHS_HostInfo host;
     IHS_SessionInfo session;
+    IHS_StreamInterface stream_interface;
 } session_fragment_args_t;
 
 extern const lv_fragment_class_t session_fragment_class;

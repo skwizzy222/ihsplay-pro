@@ -14,6 +14,7 @@
 #include "stream_input.h"
 
 #include "backend/input_manager.h"
+#include "backend/host_manager.h"
 #include "logging.h"
 
 static void session_initialized(IHS_Session *session, void *context);
@@ -50,7 +51,18 @@ static void back_timer_finish_main(app_t *app, void *context);
 
 static void grab_mouse(stream_manager_t *manager, bool grab);
 
+static void watchdog_timer_stop(stream_manager_t *manager);
+
+static void watchdog_timer_start(stream_manager_t *manager);
+
+static Uint32 watchdog_timer_callback(Uint32 duration, void *param);
+
+static void watchdog_trigger_main(app_t *app, void *context);
+
 #define BACK_COUNTER_MAX 100
+#define WATCHDOG_INTERVAL_MS 1000
+#define WATCHDOG_NO_FRAME_MS 5000
+#define WATCHDOG_MAX_ATTEMPTS 3
 
 typedef struct event_context_t {
     stream_manager_t *manager;
@@ -114,6 +126,10 @@ bool stream_manager_start_session(stream_manager_t *manager, const IHS_SessionIn
     manager->back_timer = 0;
     manager->overlay_opened = false;
     manager->requested_disconnect = false;
+    manager->last_video_frame_ms = 0;
+    if (!manager->watchdog_reconnect) {
+        manager->watchdog_attempts = 0;
+    }
 
     stream_media_session_t *media = stream_media_create(manager);
     manager->media = media;
@@ -146,8 +162,40 @@ void stream_manager_stop_active(stream_manager_t *manager) {
     if (manager->state != STREAM_MANAGER_STATE_STREAMING) {
         return;
     }
+    watchdog_timer_stop(manager);
+    manager->watchdog_reconnect = false;
     manager->requested_disconnect = true;
     IHS_SessionDisconnect(manager->session);
+}
+
+void stream_manager_set_reconnect_target(stream_manager_t *manager, const IHS_HostInfo *host,
+                                         IHS_StreamInterface stream_interface) {
+    if (host == NULL) {
+        manager->has_reconnect_target = false;
+        return;
+    }
+    manager->reconnect_host = *host;
+    manager->reconnect_interface = stream_interface;
+    manager->has_reconnect_target = true;
+}
+
+void stream_manager_note_video_frame(stream_manager_t *manager) {
+    if (manager == NULL || manager->state != STREAM_MANAGER_STATE_STREAMING) {
+        return;
+    }
+    manager->last_video_frame_ms = SDL_GetTicks();
+}
+
+bool stream_manager_is_reconnecting(const stream_manager_t *manager) {
+    return manager != NULL && manager->watchdog_reconnect;
+}
+
+void stream_manager_clear_reconnect(stream_manager_t *manager) {
+    if (manager == NULL) {
+        return;
+    }
+    manager->watchdog_reconnect = false;
+    manager->watchdog_attempts = 0;
 }
 
 bool stream_manager_intercept_event(const stream_manager_t *manager, const SDL_Event *event) {
@@ -290,7 +338,11 @@ static void session_connected(IHS_Session *session, void *context) {
     assert(manager->state == STREAM_MANAGER_STATE_CONNECTING);
     assert(manager->session == session);
     manager->state = STREAM_MANAGER_STATE_STREAMING;
+    manager->watchdog_reconnect = false;
+    manager->watchdog_attempts = 0;
+    manager->last_video_frame_ms = 0;
     commons_log_info("StreamManager", "Change state to STREAMING");
+    watchdog_timer_start(manager);
     event_context_t ec = {
             .manager = manager,
             .arg1 = (void *) IHS_SessionGetInfo(session),
@@ -305,6 +357,7 @@ static void session_disconnected(IHS_Session *session, void *context) {
     stream_manager_t *manager = (stream_manager_t *) context;
     assert(manager->state != STREAM_MANAGER_STATE_DISCONNECTING);
     assert(manager->session == session);
+    watchdog_timer_stop(manager);
     if (manager->back_timer != 0) {
         SDL_RemoveTimer(manager->back_timer);
         manager->back_timer = 0;
@@ -365,12 +418,24 @@ static void session_show_cursor_main(app_t *app, void *context) {
 }
 
 static void destroy_session_main(app_t *app, void *context) {
-    (void) app;
     IHS_Session *session = context;
+    stream_manager_t *manager = app->stream_manager;
     IHS_SessionThreadedJoin(session);
     IHS_SessionDestroy(session);
-    stream_media_destroy(app->stream_manager->media);
-    app->stream_manager->media = NULL;
+    if (manager->session == session) {
+        manager->session = NULL;
+    }
+    stream_media_destroy(manager->media);
+    manager->media = NULL;
+
+    if (manager->watchdog_reconnect && manager->has_reconnect_target) {
+        commons_log_info("StreamManager", "Watchdog requesting new session (attempt %d/%d)",
+                         manager->watchdog_attempts, WATCHDOG_MAX_ATTEMPTS);
+        host_manager_session_request_ex(app->host_manager, &manager->reconnect_host,
+                                        manager->reconnect_interface);
+    } else {
+        manager->watchdog_reconnect = false;
+    }
 }
 
 static void controller_back_pressed(stream_manager_t *manager) {
@@ -433,4 +498,66 @@ static void back_timer_finish_main(app_t *app, void *context) {
     stream_manager_t *manager = (stream_manager_t *) context;
     stream_manager_set_overlay_opened(manager, true);
     listeners_list_notify(manager->listeners, stream_manager_listener_t, overlay_progress_finished, true);
+}
+
+static void watchdog_timer_stop(stream_manager_t *manager) {
+    if (manager->watchdog_timer != 0) {
+        SDL_RemoveTimer(manager->watchdog_timer);
+        manager->watchdog_timer = 0;
+    }
+}
+
+static void watchdog_timer_start(stream_manager_t *manager) {
+    watchdog_timer_stop(manager);
+    manager->watchdog_timer = SDL_AddTimer(WATCHDOG_INTERVAL_MS, watchdog_timer_callback, manager);
+}
+
+static Uint32 watchdog_timer_callback(Uint32 duration, void *param) {
+    (void) duration;
+    stream_manager_t *manager = (stream_manager_t *) param;
+    if (manager->state != STREAM_MANAGER_STATE_STREAMING) {
+        return 0;
+    }
+    /* Arm only after the first decoded frame. */
+    if (manager->last_video_frame_ms == 0) {
+        return WATCHDOG_INTERVAL_MS;
+    }
+    uint32_t elapsed = SDL_GetTicks() - manager->last_video_frame_ms;
+    if (elapsed < WATCHDOG_NO_FRAME_MS) {
+        return WATCHDOG_INTERVAL_MS;
+    }
+    app_run_on_main(manager->app, watchdog_trigger_main, manager);
+    return WATCHDOG_INTERVAL_MS;
+}
+
+static void watchdog_trigger_main(app_t *app, void *context) {
+    (void) app;
+    stream_manager_t *manager = (stream_manager_t *) context;
+    if (manager->state != STREAM_MANAGER_STATE_STREAMING || manager->session == NULL) {
+        return;
+    }
+    if (manager->last_video_frame_ms == 0) {
+        return;
+    }
+    if (SDL_GetTicks() - manager->last_video_frame_ms < WATCHDOG_NO_FRAME_MS) {
+        return;
+    }
+    if (!manager->has_reconnect_target) {
+        commons_log_warn("StreamManager", "Watchdog: no frames, but no reconnect target");
+        return;
+    }
+    if (manager->watchdog_attempts >= WATCHDOG_MAX_ATTEMPTS) {
+        commons_log_error("StreamManager", "Watchdog: max reconnect attempts reached");
+        manager->watchdog_reconnect = false;
+        manager->requested_disconnect = false;
+        IHS_SessionDisconnect(manager->session);
+        return;
+    }
+    manager->watchdog_attempts += 1;
+    manager->watchdog_reconnect = true;
+    manager->last_video_frame_ms = 0;
+    commons_log_warn("StreamManager", "Watchdog: no video for %d ms, reconnecting (%d/%d)",
+                     WATCHDOG_NO_FRAME_MS, manager->watchdog_attempts, WATCHDOG_MAX_ATTEMPTS);
+    watchdog_timer_stop(manager);
+    IHS_SessionDisconnect(manager->session);
 }
