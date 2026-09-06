@@ -10,9 +10,6 @@
 #include <unistd.h>
 #include <strings.h>
 #include <ctype.h>
-#include <errno.h>
-#include <sys/select.h>
-#include <time.h>
 
 #include <pbnjson.h>
 #include "lunasynccall.h"
@@ -80,91 +77,14 @@ static bool luna_call(const char *uri, const char *payload, char **out) {
 }
 
 /**
- * Pairing/HID often need a live subscription until endPairing / connected.
- * On rooted webOS, luna-send -i is the reliable path.
+ * Pairing/HID need a live LS2 subscription until endPairing / connected.
+ * Do NOT use luna-send: on TV it is root-only (-rwx------), so popen fails instantly.
  */
 static bool luna_subscribe_wait(const char *uri, const char *payload, const char *success_needle,
                                 int timeout_sec, char *err_buf, size_t err_buf_len) {
-    char cmd[512];
-    /* payload is JSON with double-quotes; wrap in single quotes for sh */
-    snprintf(cmd, sizeof(cmd), "luna-send -i -f '%s' '%s' 2>/dev/null", uri, payload);
     commons_log_info("BTGamepad", "subscribe: %s", uri);
-
-    FILE *fp = popen(cmd, "r");
-    if (fp == NULL) {
-        if (err_buf && err_buf_len) {
-            snprintf(err_buf, err_buf_len, "Не удалось вызвать luna-send");
-        }
-        return false;
-    }
-
-    int fd = fileno(fp);
-    char acc[8192] = {0};
-    size_t acc_len = 0;
-    time_t deadline = time(NULL) + timeout_sec;
-    bool ok = false;
-
-    while (time(NULL) < deadline) {
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        FD_SET(fd, &rfds);
-        struct timeval tv = {.tv_sec = 1, .tv_usec = 0};
-        int sel = select(fd + 1, &rfds, NULL, NULL, &tv);
-        if (sel < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            break;
-        }
-        if (sel == 0) {
-            continue;
-        }
-        char buf[1024];
-        ssize_t n = read(fd, buf, sizeof(buf) - 1);
-        if (n <= 0) {
-            break;
-        }
-        buf[n] = '\0';
-        size_t copy = (size_t) n;
-        if (acc_len + copy >= sizeof(acc)) {
-            copy = sizeof(acc) - 1 - acc_len;
-        }
-        memcpy(acc + acc_len, buf, copy);
-        acc_len += copy;
-        acc[acc_len] = '\0';
-        remember_adapter(acc);
-
-        if (strstr(acc, "\"returnValue\":false") || strstr(acc, "\"returnValue\": false")) {
-            ok = false;
-            if (err_buf && err_buf_len) {
-                const char *et = strstr(acc, "\"errorText\"");
-                if (et) {
-                    snprintf(err_buf, err_buf_len, "Bluetooth: ошибка сопряжения/connect");
-                } else {
-                    snprintf(err_buf, err_buf_len, "Bluetooth вернул ошибку");
-                }
-            }
-            break;
-        }
-        if (success_needle && strstr(acc, success_needle)) {
-            ok = true;
-            break;
-        }
-        /* Some firmwares only send subscribed:true then silence until end — also accept
-         * a late returnValue true with request endPairing variants */
-        if (strstr(acc, "endPairing") || strstr(acc, "\"connected\":true") ||
-            strstr(acc, "\"connected\": true")) {
-            ok = true;
-            break;
-        }
-    }
-
-    /* Kill luna-send subscription */
-    pclose(fp);
-
-    if (!ok && err_buf && err_buf_len && err_buf[0] == '\0') {
-        snprintf(err_buf, err_buf_len, "Таймаут ожидания Bluetooth (%ds)", timeout_sec);
-    }
+    bool ok = HLunaServiceCallSyncSubscribe(uri, payload, true, success_needle, timeout_sec, err_buf,
+                                            err_buf_len);
     commons_log_info("BTGamepad", "subscribe done ok=%d needle=%s", (int) ok,
                      success_needle ? success_needle : "");
     return ok;
