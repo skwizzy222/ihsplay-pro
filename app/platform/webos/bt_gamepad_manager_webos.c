@@ -10,6 +10,13 @@
 #include <unistd.h>
 #include <strings.h>
 #include <ctype.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/select.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <time.h>
 
 #include <pbnjson.h>
 #include "lunasynccall.h"
@@ -77,14 +84,134 @@ static bool luna_call(const char *uri, const char *payload, char **out) {
 }
 
 /**
- * Pairing/HID need a live LS2 subscription until endPairing / connected.
- * Do NOT use luna-send: on TV it is root-only (-rwx------), so popen fails instantly.
+ * Keep a live bluetooth2 subscription until endPairing / connected.
+ * Use /usr/bin/luna-send-pub (world-executable). Plain luna-send is root-only
+ * (-rwx------). HLunaService multi-reply needs a GMainLoop we do not pump.
+ * Marker: BT_PAIR_VIA_LUNASEND_PUB
+ *
+ * fork+exec so we can SIGTERM the subscriber (pclose hangs on luna-send -i).
  */
 static bool luna_subscribe_wait(const char *uri, const char *payload, const char *success_needle,
                                 int timeout_sec, char *err_buf, size_t err_buf_len) {
-    commons_log_info("BTGamepad", "subscribe: %s", uri);
-    bool ok = HLunaServiceCallSyncSubscribe(uri, payload, true, success_needle, timeout_sec, err_buf,
-                                            err_buf_len);
+    if (err_buf && err_buf_len) {
+        err_buf[0] = '\0';
+    }
+    commons_log_info("BTGamepad", "subscribe(pub): %s", uri);
+
+    static const char *bins[] = {"/usr/bin/luna-send-pub", "/usr/bin/luna-send", NULL};
+    const char *bin = NULL;
+    for (int i = 0; bins[i]; i++) {
+        if (access(bins[i], X_OK) == 0) {
+            bin = bins[i];
+            break;
+        }
+    }
+    if (bin == NULL) {
+        bool ok = HLunaServiceCallSyncSubscribe(uri, payload, true, success_needle, timeout_sec,
+                                                err_buf, err_buf_len);
+        commons_log_info("BTGamepad", "subscribe LS2 fallback ok=%d", (int) ok);
+        return ok;
+    }
+
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        if (err_buf && err_buf_len) {
+            snprintf(err_buf, err_buf_len, "Bluetooth: pipe failed");
+        }
+        return false;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        if (err_buf && err_buf_len) {
+            snprintf(err_buf, err_buf_len, "Bluetooth: fork failed");
+        }
+        return false;
+    }
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
+        close(pipefd[1]);
+        execl(bin, bin, "-i", "-f", uri, payload, (char *) NULL);
+        _exit(127);
+    }
+    close(pipefd[1]);
+    commons_log_info("BTGamepad", "using %s pid=%d", bin, (int) pid);
+
+    int fd = pipefd[0];
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags >= 0) {
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
+
+    char acc[8192] = {0};
+    size_t acc_len = 0;
+    time_t deadline = time(NULL) + (timeout_sec > 0 ? timeout_sec : 1);
+    bool ok = false;
+
+    while (time(NULL) < deadline) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+        struct timeval tv = {.tv_sec = 1, .tv_usec = 0};
+        int sel = select(fd + 1, &rfds, NULL, NULL, &tv);
+        if (sel < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            break;
+        }
+        if (sel == 0) {
+            continue;
+        }
+        char buf[1024];
+        ssize_t n = read(fd, buf, sizeof(buf) - 1);
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+            break;
+        }
+        if (n == 0) {
+            break;
+        }
+        buf[n] = '\0';
+        size_t copy = (size_t) n;
+        if (acc_len + copy >= sizeof(acc)) {
+            copy = sizeof(acc) - 1 - acc_len;
+        }
+        memcpy(acc + acc_len, buf, copy);
+        acc_len += copy;
+        acc[acc_len] = '\0';
+        remember_adapter(acc);
+        commons_log_info("BTGamepad", "sub msg: %.160s", buf);
+
+        if ((strstr(acc, "\"returnValue\":false") || strstr(acc, "\"returnValue\": false")) &&
+            (strstr(acc, "\"subscribed\":false") || strstr(acc, "\"subscribed\": false"))) {
+            ok = false;
+            if (err_buf && err_buf_len) {
+                snprintf(err_buf, err_buf_len, "Bluetooth: ошибка сопряжения/connect");
+            }
+            break;
+        }
+        if ((success_needle && strstr(acc, success_needle)) || strstr(acc, "endPairing") ||
+            strstr(acc, "\"connected\":true") || strstr(acc, "\"connected\": true")) {
+            ok = true;
+            break;
+        }
+    }
+
+    close(fd);
+    kill(pid, SIGTERM);
+    int status = 0;
+    waitpid(pid, &status, 0);
+
+    if (!ok && err_buf && err_buf_len && err_buf[0] == '\0') {
+        snprintf(err_buf, err_buf_len, "Таймаут ожидания Bluetooth (%ds)", timeout_sec);
+    }
     commons_log_info("BTGamepad", "subscribe done ok=%d needle=%s", (int) ok,
                      success_needle ? success_needle : "");
     return ok;
@@ -450,7 +577,7 @@ bool bt_gamepad_connect(const char *address, char *err_buf, size_t err_buf_len) 
     if (!paired) {
         char payload[192];
         json_with_adapter(payload, sizeof(payload), address, true);
-        if (!luna_subscribe_wait(BT_ADAPTER "/pair", payload, "endPairing", 30, err_buf, err_buf_len)) {
+        if (!luna_subscribe_wait(BT_ADAPTER "/pair", payload, "endPairing", 45, err_buf, err_buf_len)) {
             /* Some pads finish without endPairing keyword — accept if now paired */
             if (!address_is_paired(address)) {
                 if (err_buf && err_buf_len && err_buf[0] == '\0') {
@@ -459,48 +586,49 @@ bool bt_gamepad_connect(const char *address, char *err_buf, size_t err_buf_len) 
                 }
                 return false;
             }
+            if (err_buf && err_buf_len) {
+                err_buf[0] = '\0';
+            }
         }
         usleep(500000);
     }
 
+    /* Community golden path: one-shot hid/connect (no subscribe required). */
     char payload[192];
-    json_with_adapter(payload, sizeof(payload), address, true);
-    char hid_err[128] = {0};
-    bool hid_ok = luna_subscribe_wait(BT_HID "/connect", payload, "\"connected\":true", 20,
-                                      hid_err, sizeof(hid_err));
+    json_with_adapter(payload, sizeof(payload), address, false);
+    char *raw = NULL;
+    bool hid_ok = luna_call(BT_HID "/connect", payload, &raw);
     if (!hid_ok) {
-        /* Fallback one-shot */
-        json_with_adapter(payload, sizeof(payload), address, false);
-        char *raw = NULL;
-        hid_ok = luna_call(BT_HID "/connect", payload, &raw);
-        if (!hid_ok && raw && err_buf && err_buf_len) {
-            snprintf(err_buf, err_buf_len, "HID connect: Failed to connect with remote device");
+        commons_log_warn("BTGamepad", "hid one-shot failed: %s", raw ? raw : "(null)");
+        free(raw);
+        raw = NULL;
+        /* Retry with subscribe (some firmwares) */
+        json_with_adapter(payload, sizeof(payload), address, true);
+        char hid_err[128] = {0};
+        hid_ok = luna_subscribe_wait(BT_HID "/connect", payload, "\"connected\":true", 20, hid_err,
+                                     sizeof(hid_err));
+        if (!hid_ok && err_buf && err_buf_len && err_buf[0] == '\0') {
+            snprintf(err_buf, err_buf_len, "%s",
+                     hid_err[0] ? hid_err : "HID connect: Failed to connect with remote device");
         }
+    } else {
         free(raw);
     }
-    usleep(800000);
-    if (!address_has_hid(address) && !hid_ok) {
-        if (err_buf && err_buf_len) {
-            if (hid_err[0]) {
-                snprintf(err_buf, err_buf_len, "%s", hid_err);
-            } else if (err_buf[0] == '\0') {
-                snprintf(err_buf, err_buf_len,
-                         "Не удалось открыть HID. Геймпад в pairing? Уже занят телефоном?");
-            }
-        }
-        return false;
-    }
-    if (!address_has_hid(address)) {
-        /* Connected flag without profile yet — soft success if hid_ok */
-        if (hid_ok) {
+
+    for (int i = 0; i < 15; i++) {
+        if (address_has_hid(address)) {
             return true;
         }
-        if (err_buf && err_buf_len) {
-            snprintf(err_buf, err_buf_len, "Подключение прошло, но HID-профиль ещё не виден. Подождите и обновите список.");
-        }
-        return false;
+        usleep(400000);
     }
-    return true;
+    if (hid_ok) {
+        return true;
+    }
+    if (err_buf && err_buf_len && err_buf[0] == '\0') {
+        snprintf(err_buf, err_buf_len,
+                 "Не удалось открыть HID. Геймпад в pairing? Уже занят телефоном?");
+    }
+    return false;
 }
 
 bool bt_gamepad_disconnect(const char *address, char *err_buf, size_t err_buf_len) {
