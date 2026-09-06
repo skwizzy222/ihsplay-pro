@@ -103,6 +103,10 @@ int main(int argc, char *argv[]) {
     while (app->running) {
         process_events();
         uint32_t next_delay = lv_task_handler();
+        /* Cap idle delay so remote/gamepad UI stays responsive (LVGL may return 500ms+). */
+        if (next_delay > 16) {
+            next_delay = 16;
+        }
         SDL_Delay(stream_manager_is_active(app->stream_manager) ? 1 : next_delay);
     }
     // Drain remaining events

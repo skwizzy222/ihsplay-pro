@@ -318,7 +318,7 @@ lv_obj_t *app_lv_win_add_close_btn(lv_obj_t *win, app_t *app) {
     lv_label_set_text_static(icon, BS_SYMBOL_X_LG);
 
     lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, "Close");
+    lv_label_set_text(label, "Закрыть");
 
     lv_obj_add_event_cb(btn, win_close_clicked, LV_EVENT_CLICKED, app);
     return btn;

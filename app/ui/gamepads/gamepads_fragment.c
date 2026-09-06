@@ -18,6 +18,7 @@ typedef struct gamepads_fragment_t {
     lv_obj_t *list;
     lv_obj_t *hint;
     lv_obj_t *scan_btn;
+    lv_obj_t *close_btn;
     lv_timer_t *scan_timer;
     bool scanning;
     lv_group_t *group;
@@ -44,8 +45,6 @@ static void scan_clicked(lv_event_t *e);
 static void device_clicked(lv_event_t *e);
 
 static void device_btn_deleted(lv_event_t *e);
-
-static void list_key_cb(lv_event_t *e);
 
 static void scan_timer_cb(lv_timer_t *timer);
 
@@ -84,7 +83,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     gamepads_fragment_t *fragment = (gamepads_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(container);
     lv_win_add_title(win, "Геймпады");
-    app_lv_win_add_close_btn(win, fragment->app);
+    fragment->close_btn = app_lv_win_add_close_btn(win, fragment->app);
 
     lv_obj_t *content = lv_win_get_content(win);
     lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
@@ -95,8 +94,8 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->hint = lv_label_create(content);
     if (bt_gamepad_available()) {
         lv_label_set_text(fragment->hint,
-                          "1) Искать  2) Sync/pairing на геймпаде  3) Выбрать → Подключить.\n"
-                          "Пока идёт сопряжение не выходите из меню (до ~30 сек). Листайте ↑↓.");
+                          "Пульт/джойстик: ↑↓ выбрать, OK/A открыть меню.\n"
+                          "1) Искать  2) Sync на геймпаде  3) Подключить (дождитесь конца сопряжения).");
     } else {
         lv_label_set_text(fragment->hint, "Bluetooth-геймпады доступны только на webOS TV.");
     }
@@ -120,7 +119,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_scroll_dir(fragment->list, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(fragment->list, LV_SCROLLBAR_MODE_ACTIVE);
     lv_obj_add_flag(fragment->list, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_event_cb(fragment->list, list_key_cb, LV_EVENT_KEY, fragment);
+    /* Do NOT put the list container in the keypad group — only its buttons. */
 
     return win;
 }
@@ -131,8 +130,10 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     fragment->group = lv_group_create();
     lv_group_set_wrap(fragment->group, false);
     app_ui_push_modal_group(fragment->app->ui, fragment->group);
+    if (fragment->close_btn) {
+        lv_group_add_obj(fragment->group, fragment->close_btn);
+    }
     lv_group_add_obj(fragment->group, fragment->scan_btn);
-    lv_group_add_obj(fragment->group, fragment->list);
 
     if (bt_gamepad_available()) {
         bt_gamepad_refresh_devices(&fragment->devices);
@@ -168,22 +169,14 @@ static bool event_cb(lv_fragment_t *self, int code, void *data) {
     return false;
 }
 
-static void list_key_cb(lv_event_t *e) {
-    lv_obj_t *list = lv_event_get_target(e);
-    lv_key_t key = lv_event_get_key(e);
-    if (key == LV_KEY_DOWN || key == LV_KEY_RIGHT) {
-        lv_obj_scroll_by_bounded(list, 0, -LV_DPX(56), LV_ANIM_ON);
-    } else if (key == LV_KEY_UP || key == LV_KEY_LEFT) {
-        lv_obj_scroll_by_bounded(list, 0, LV_DPX(56), LV_ANIM_ON);
-    }
-}
-
 static void rebuild_list(gamepads_fragment_t *fragment) {
     lv_obj_clean(fragment->list);
     if (fragment->group) {
         lv_group_remove_all_objs(fragment->group);
+        if (fragment->close_btn) {
+            lv_group_add_obj(fragment->group, fragment->close_btn);
+        }
         lv_group_add_obj(fragment->group, fragment->scan_btn);
-        lv_group_add_obj(fragment->group, fragment->list);
     }
 
     for (int i = 0, n = (int) array_list_size(&fragment->devices); i < n; i++) {
@@ -197,7 +190,6 @@ static void rebuild_list(gamepads_fragment_t *fragment) {
         lv_obj_t *btn = lv_list_add_btn(fragment->list, NULL, line);
         lv_obj_set_height(btn, LV_SIZE_CONTENT);
         lv_obj_set_style_pad_ver(btn, LV_DPX(10), 0);
-        /* Make label wrap */
         uint32_t child_cnt = lv_obj_get_child_cnt(btn);
         for (uint32_t c = 0; c < child_cnt; c++) {
             lv_obj_t *ch = lv_obj_get_child(btn, c);
@@ -224,6 +216,9 @@ static void rebuild_list(gamepads_fragment_t *fragment) {
                          fragment->scanning
                          ? "Поиск геймпадов… (анонимный BLE скрыт)"
                          : "Подходящих устройств нет. Запустите поиск и sync на джойстике.");
+    }
+    if (fragment->group && fragment->scan_btn) {
+        lv_group_focus_obj(fragment->scan_btn);
     }
 }
 

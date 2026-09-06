@@ -31,8 +31,9 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *parent) {
 
     lv_obj_t *hint1 = lv_label_create(content);
     lv_obj_set_width(hint1, LV_PCT(100));
-    lv_label_set_text(hint1, "Please include information below when you send feedback. "
-                             "You can also scan the QR code to copy the text.");
+    lv_label_set_text(hint1,
+                      "IHSplay Pro. При обращении приложите данные ниже "
+                      "(или отсканируйте QR).");
 
     lv_obj_t *qrcode = lv_qrcode_create(content, LV_DPX(200), lv_color_black(), lv_color_white());
     lv_obj_set_style_pad_all(qrcode, LV_DPX(5), 0);
