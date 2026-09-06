@@ -40,3 +40,11 @@ bool bt_gamepad_disconnect(const char *address, char *err_buf, size_t err_buf_le
     }
     return false;
 }
+
+bool bt_gamepad_unpair(const char *address, char *err_buf, size_t err_buf_len) {
+    (void) address;
+    if (err_buf && err_buf_len) {
+        snprintf(err_buf, err_buf_len, "Bluetooth-геймпады доступны только на webOS TV");
+    }
+    return false;
+}
