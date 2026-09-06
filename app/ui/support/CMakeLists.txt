@@ -1,1 +1,1 @@
-target_sources(ihsplay PRIVATE support.c wiki.c feedback.c)
+target_sources(ihsplay PRIVATE support.c wiki.c feedback.c tips.c)

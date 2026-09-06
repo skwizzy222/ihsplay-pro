@@ -65,6 +65,28 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     app_ui_push_modal_group(fragment->app->ui, fragment->group);
     if (fragment->close_btn) {
         lv_group_add_obj(fragment->group, fragment->close_btn);
+    }
+    /* Focus dropdowns inside basic content */
+    lv_obj_t *first_dd = NULL;
+    if (f->obj) {
+        uint32_t n = lv_obj_get_child_cnt(f->obj);
+        for (uint32_t i = 0; i < n; i++) {
+            lv_obj_t *row = lv_obj_get_child(f->obj, i);
+            uint32_t cn = lv_obj_get_child_cnt(row);
+            for (uint32_t j = 0; j < cn; j++) {
+                lv_obj_t *ch = lv_obj_get_child(row, j);
+                if (lv_obj_check_type(ch, &lv_dropdown_class)) {
+                    lv_group_add_obj(fragment->group, ch);
+                    if (first_dd == NULL) {
+                        first_dd = ch;
+                    }
+                }
+            }
+        }
+    }
+    if (first_dd) {
+        lv_group_focus_obj(first_dd);
+    } else if (fragment->close_btn) {
         lv_group_focus_obj(fragment->close_btn);
     }
 }
