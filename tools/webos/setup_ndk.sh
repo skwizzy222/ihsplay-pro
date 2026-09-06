@@ -2,8 +2,8 @@
 set -euo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-mkdir -p /tmp/webos-ndk
-cd /tmp/webos-ndk
+mkdir -p "$HOME/webos-ndk"
+cd "$HOME/webos-ndk"
 
 ARCHIVE=arm-webos-linux-gnueabi_sdk-buildroot-x86_64.tar.gz
 URL=https://github.com/openlgtv/buildroot-nc4/releases/download/webos-a38c582/${ARCHIVE}

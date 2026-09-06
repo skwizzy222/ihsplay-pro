@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include "app.h"
 #include "app_ui.h"
 #include "config.h"
@@ -8,6 +9,7 @@
 
 #include "hosts/hosts_fragment.h"
 #include "hosts/add_host_fragment.h"
+#include "gamepads/gamepads_fragment.h"
 #include "settings/settings.h"
 #include "support/support.h"
 
@@ -20,11 +22,12 @@
 #include "lvgl/theme.h"
 #include "ui/connection/connection_fragment.h"
 #include "backend/input_manager.h"
+#include "assets/hydra_icon.h"
 
 typedef struct launcher_fragment {
     lv_fragment_t base;
     app_t *app;
-    lv_coord_t row_dsc[6], col_dsc[4];
+    lv_coord_t row_dsc[7], col_dsc[4];
     struct {
         lv_style_t root;
         lv_style_t option_icon;
@@ -40,6 +43,7 @@ typedef struct launcher_fragment {
     lv_obj_t *btn_steam;
     lv_obj_t *btn_hydra;
     lv_obj_t *selected_host;
+    lv_obj_t *wake_host;
     lv_obj_t *add_host;
     lv_obj_t *gamepads;
 
@@ -74,6 +78,8 @@ static void launch_option_set_text(lv_obj_t *obj, const char *label);
 
 static void focus_content(lv_event_t *e);
 
+static void play_btn_key(lv_event_t *e);
+
 static void open_settings(lv_event_t *e);
 
 static void open_support(lv_event_t *e);
@@ -81,6 +87,10 @@ static void open_support(lv_event_t *e);
 static void select_host(lv_event_t *e);
 
 static void add_host_clicked(lv_event_t *e);
+
+static void wake_host_clicked(lv_event_t *e);
+
+static void gamepads_clicked(lv_event_t *e);
 
 static void request_session(lv_event_t *e);
 
@@ -116,8 +126,9 @@ static void constructor(lv_fragment_t *self, void *arg) {
     fragment->row_dsc[1] = LV_DPX(40);
     fragment->row_dsc[2] = LV_DPX(40);
     fragment->row_dsc[3] = LV_DPX(40);
-    fragment->row_dsc[4] = LV_GRID_FR(1);
-    fragment->row_dsc[5] = LV_GRID_TEMPLATE_LAST;
+    fragment->row_dsc[4] = LV_DPX(40);
+    fragment->row_dsc[5] = LV_GRID_FR(1);
+    fragment->row_dsc[6] = LV_GRID_TEMPLATE_LAST;
 
     lv_style_init(&fragment->styles.root);
     lv_style_set_pad_gap(&fragment->styles.root, LV_DPX(10));
@@ -264,13 +275,16 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_grid_dsc_array(nav_content, fragment->col_dsc, fragment->row_dsc);
     lv_obj_set_style_pad_gap(nav_content, LV_DPX(20), 0);
 
+    /* Tall tiles like Steam Link: own column + flex grow. KEY handled on buttons
+     * (play_btn_key) because nested parents break nav_content focus bubbling. */
     lv_obj_t *play_col = lv_obj_create(nav_content);
     lv_obj_remove_style_all(play_col);
-    lv_obj_set_grid_cell(play_col, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0, 5);
+    lv_obj_set_grid_cell(play_col, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 6);
     lv_obj_set_flex_flow(play_col, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(play_col, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(play_col, LV_DPX(16), 0);
+    lv_obj_set_style_pad_gap(play_col, LV_DPX(12), 0);
     lv_obj_clear_flag(play_col, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(play_col, LV_OBJ_FLAG_CLICK_FOCUSABLE);
 
     lv_obj_t *btn_steam = lv_btn_create(play_col);
     fragment->btn_steam = btn_steam;
@@ -279,9 +293,10 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_add_style(btn_steam, &fragment->styles.play_btn_focused, LV_STATE_FOCUS_KEY);
     lv_obj_add_style(btn_steam, &fragment->styles.play_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_width(btn_steam, LV_PCT(100));
-    lv_obj_set_height(btn_steam, LV_DPX(120));
+    lv_obj_set_flex_grow(btn_steam, 1);
     lv_obj_set_flex_flow(btn_steam, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(btn_steam, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_ver(btn_steam, LV_DPX(8), 0);
     lv_obj_set_user_data(btn_steam, (void *) (intptr_t) IHS_StreamInterfaceBigPicture);
 
     lv_obj_t *img_steam = lv_label_create(btn_steam);
@@ -296,6 +311,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_text_color(label_steam_sub, lv_color_hex(0xd2e885), 0);
     lv_label_set_text(label_steam_sub, "Big Picture · Steam Link");
     lv_obj_add_event_cb(btn_steam, request_session, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(btn_steam, play_btn_key, LV_EVENT_KEY, NULL);
 
     lv_obj_t *btn_hydra = lv_btn_create(play_col);
     fragment->btn_hydra = btn_hydra;
@@ -304,15 +320,16 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_add_style(btn_hydra, &fragment->styles.play_btn_hydra_focused, LV_STATE_FOCUS_KEY);
     lv_obj_add_style(btn_hydra, &fragment->styles.play_btn_pressed, LV_STATE_PRESSED);
     lv_obj_set_width(btn_hydra, LV_PCT(100));
-    lv_obj_set_height(btn_hydra, LV_DPX(120));
+    lv_obj_set_flex_grow(btn_hydra, 1);
     lv_obj_set_flex_flow(btn_hydra, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(btn_hydra, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_ver(btn_hydra, LV_DPX(8), 0);
     lv_obj_set_user_data(btn_hydra, (void *) (intptr_t) IHS_StreamInterfaceDesktop);
 
-    lv_obj_t *img_hydra = lv_label_create(btn_hydra);
-    lv_obj_set_style_text_font(img_hydra, fragment->app->ui->iconfont.heading2, 0);
-    lv_obj_set_style_text_color(img_hydra, lv_color_hex(0x66c0f4), 0);
-    lv_label_set_text_static(img_hydra, BS_SYMBOL_CONTROLLER);
+    lv_obj_t *img_hydra = lv_img_create(btn_hydra);
+    lv_img_set_src(img_hydra, &ui_img_hydra_icon);
+    lv_obj_clear_flag(img_hydra, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(img_hydra, LV_OBJ_FLAG_CLICK_FOCUSABLE);
     lv_obj_t *label_hydra = lv_label_create(btn_hydra);
     lv_obj_set_style_text_font(label_hydra, fragment->app->ui->font.heading3, 0);
     lv_obj_set_style_text_color(label_hydra, lv_color_white(), 0);
@@ -321,11 +338,16 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_text_color(label_hydra_sub, lv_color_hex(0x66c0f4), 0);
     lv_label_set_text(label_hydra_sub, "Рабочий стол · Steam Link");
     lv_obj_add_event_cb(btn_hydra, request_session, LV_EVENT_CLICKED, fragment);
+    lv_obj_add_event_cb(btn_hydra, play_btn_key, LV_EVENT_KEY, NULL);
 
     lv_obj_t *selected_host = launch_option_create_label_action(fragment, BS_SYMBOL_DISPLAY, NULL);
     fragment->selected_host = selected_host;
 
     lv_obj_add_event_cb(selected_host, select_host, LV_EVENT_CLICKED, fragment);
+
+    lv_obj_t *wake_host = launch_option_create_label_action(fragment, BS_SYMBOL_POWER, "Разбудить ПК");
+    fragment->wake_host = wake_host;
+    lv_obj_add_event_cb(wake_host, wake_host_clicked, LV_EVENT_CLICKED, fragment);
 
     lv_obj_t *add_host = launch_option_create_label_action(fragment, BS_SYMBOL_WINDOW_DESKTOP, "Добавить компьютер…");
     fragment->add_host = add_host;
@@ -333,6 +355,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_t *gamepads = launch_option_create_label_action(fragment, BS_SYMBOL_CONTROLLER, NULL);
     fragment->gamepads = gamepads;
+    lv_obj_add_event_cb(gamepads, gamepads_clicked, LV_EVENT_CLICKED, fragment);
 
     lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_RIGHT, btn_support);
     lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_BOTTOM, btn_steam);
@@ -351,10 +374,14 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_set_dir_focus_obj(selected_host, LV_DIR_LEFT, btn_steam);
     lv_obj_set_dir_focus_obj(selected_host, LV_DIR_TOP, btn_settings);
-    lv_obj_set_dir_focus_obj(selected_host, LV_DIR_BOTTOM, add_host);
+    lv_obj_set_dir_focus_obj(selected_host, LV_DIR_BOTTOM, wake_host);
+
+    lv_obj_set_dir_focus_obj(wake_host, LV_DIR_LEFT, btn_hydra);
+    lv_obj_set_dir_focus_obj(wake_host, LV_DIR_TOP, selected_host);
+    lv_obj_set_dir_focus_obj(wake_host, LV_DIR_BOTTOM, add_host);
 
     lv_obj_set_dir_focus_obj(add_host, LV_DIR_LEFT, btn_hydra);
-    lv_obj_set_dir_focus_obj(add_host, LV_DIR_TOP, selected_host);
+    lv_obj_set_dir_focus_obj(add_host, LV_DIR_TOP, wake_host);
     lv_obj_set_dir_focus_obj(add_host, LV_DIR_BOTTOM, gamepads);
 
     lv_obj_set_dir_focus_obj(gamepads, LV_DIR_LEFT, btn_hydra);
@@ -466,6 +493,11 @@ static void focus_content(lv_event_t *e) {
     lv_obj_focus_dir_by_key(target, lv_event_get_key(e));
 }
 
+static void play_btn_key(lv_event_t *e) {
+    /* Direct KEY handling — do not rely on parent bubble (Magic Remote D-pad). */
+    lv_obj_focus_dir_by_key(lv_event_get_current_target(e), lv_event_get_key(e));
+}
+
 static void open_settings(lv_event_t *e) {
     launcher_fragment *fragment = lv_event_get_user_data(e);
     app_ui_push_fragment(fragment->app->ui, &settings_fragment_class, NULL);
@@ -484,6 +516,24 @@ static void select_host(lv_event_t *e) {
 static void add_host_clicked(lv_event_t *e) {
     launcher_fragment *fragment = lv_event_get_user_data(e);
     app_ui_push_fragment(fragment->app->ui, &add_host_fragment_class, NULL);
+}
+
+static void gamepads_clicked(lv_event_t *e) {
+    launcher_fragment *fragment = lv_event_get_user_data(e);
+    app_ui_push_fragment(fragment->app->ui, &gamepads_fragment_class, NULL);
+}
+
+static void wake_host_clicked(lv_event_t *e) {
+    launcher_fragment *fragment = lv_event_get_user_data(e);
+    if (fragment->selected_host_id == 0) {
+        return;
+    }
+    host_manager_t *manager = fragment->app->host_manager;
+    if (host_manager_wake(manager, fragment->selected_host_id)) {
+        launch_option_set_text(fragment->wake_host, "Сигнал отправлен…");
+    } else {
+        launch_option_set_text(fragment->wake_host, "Нет MAC — сначала найдите ПК");
+    }
 }
 
 static void request_session(lv_event_t *e) {
@@ -505,9 +555,20 @@ static void launcher_quit(lv_event_t *e) {
 static void hosts_update(launcher_fragment *fragment) {
     const IHS_HostInfo *host = get_selected_host(fragment);
     if (host != NULL) {
-        launch_option_set_text(fragment->selected_host, host->hostname);
+        host_manager_presence presence = host_manager_get_presence(fragment->app->host_manager, host->clientId);
+        char label[96];
+        snprintf(label, sizeof(label), "%s · %s", host->hostname, host_manager_presence_label(presence));
+        launch_option_set_text(fragment->selected_host, label);
+        if (presence == HOST_MANAGER_PRESENCE_ONLINE) {
+            launch_option_set_text(fragment->wake_host, "ПК уже онлайн");
+        } else if (host->macAddress[0] != '\0') {
+            launch_option_set_text(fragment->wake_host, "Разбудить ПК (WoL)");
+        } else {
+            launch_option_set_text(fragment->wake_host, "WoL недоступен (нет MAC)");
+        }
     } else {
         launch_option_set_text(fragment->selected_host, "Выберите компьютер…");
+        launch_option_set_text(fragment->wake_host, "Разбудить ПК");
     }
 }
 

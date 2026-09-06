@@ -5,7 +5,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 SRC_WIN=/mnt/c/Users/Michael/Projects/ihsplay-pro
 SRC=/tmp/ihsplay-src
 BUILD=/tmp/ihsplay-build
-TOOLCHAIN_FILE=/tmp/webos-ndk/arm-webos-linux-gnueabi_sdk-buildroot/usr/share/buildroot/toolchainfile.cmake
+TOOLCHAIN_FILE=$HOME/webos-ndk/arm-webos-linux-gnueabi_sdk-buildroot/usr/share/buildroot/toolchainfile.cmake
 
 echo "Syncing sources to $SRC ..."
 rm -rf "$SRC"
