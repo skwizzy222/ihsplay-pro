@@ -51,7 +51,7 @@ def main():
     payload = '{"ipkUrl":"%s","ipkHash":"%s"}' % (URL, SHA)
     run("luna-send -i -f luna://org.webosbrew.hbchannel.service/install '" + payload + "'", 45)
     run("ls -la /media/developer/apps/usr/palm/applications/org.ihsplay.pro/ihsplay", 3)
-    run("luna-send -n 1 -f luna://com.webos.applicationManager/launch '{\"id\":\"org.ihsplay.pro\"}'", 5)
+    print("INSTALL_DONE — open the app manually from the TV Home screen")
     s.close()
 
 

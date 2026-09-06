@@ -95,8 +95,8 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->hint = lv_label_create(content);
     if (bt_gamepad_available()) {
         lv_label_set_text(fragment->hint,
-                          "Искать → sync на джойстике → выбрать устройство → Подключить / Отключить / Забыть.\n"
-                          "Листайте список кнопками вверх/вниз.");
+                          "1) Искать  2) Sync/pairing на геймпаде  3) Выбрать → Подключить.\n"
+                          "Пока идёт сопряжение не выходите из меню (до ~30 сек). Листайте ↑↓.");
     } else {
         lv_label_set_text(fragment->hint, "Bluetooth-геймпады доступны только на webOS TV.");
     }
