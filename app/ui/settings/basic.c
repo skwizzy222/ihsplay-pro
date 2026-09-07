@@ -1,5 +1,9 @@
 #include "app.h"
 #include "basic.h"
+#include "ui/i18n.h"
+#include "ui/common/key_nav.h"
+#include "ui/app_ui.h"
+#include "ui/launcher.h"
 
 #include "ss4s_modules.h"
 #include "array_list.h"
@@ -11,6 +15,7 @@
 typedef struct basic_fragment {
     lv_fragment_t base;
     app_t *app;
+    lv_obj_t *lang_dd;
     lv_obj_t *audio_dd;
     lv_obj_t *video_dd;
     char **audio_ids;
@@ -33,14 +38,33 @@ static void restart_hint_close(lv_event_t *e) {
     lv_msgbox_close_async(lv_event_get_current_target(e));
 }
 
-static void show_restart_hint(void) {
+static void show_restart_hint(app_t *app) {
     static const char *btns[] = {"OK", ""};
-    lv_obj_t *mbox = lv_msgbox_create(NULL, "Настройки",
-                                      "Модуль сохранён. Полностью закройте приложение и откройте снова, "
-                                      "чтобы аудио/видео переключились.",
+    lv_obj_t *mbox = lv_msgbox_create(NULL, APP_TR(app, "Settings", "Настройки"),
+                                      APP_TR(app,
+                                             "Module saved. Fully close the app and open it again "
+                                             "so audio/video can switch.",
+                                             "Модуль сохранён. Полностью закройте приложение и откройте снова, "
+                                             "чтобы аудио/видео переключились."),
                                       btns, false);
     lv_obj_add_event_cb(mbox, restart_hint_close, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_center(mbox);
+}
+
+static void reload_ui_locale_action(app_t *app, void *data) {
+    (void) data;
+    app_ui_t *ui = app->ui;
+    while (lv_fragment_manager_get_stack_size(ui->fm) > 0) {
+        app_ui_pop_top_fragment(ui);
+    }
+    app_ui_push_fragment(ui, &launcher_fragment_class, NULL);
+}
+
+static void lang_changed(lv_event_t *e) {
+    basic_fragment *fragment = lv_event_get_user_data(e);
+    uint16_t idx = lv_dropdown_get_selected(fragment->lang_dd);
+    app_settings_set_language(fragment->app->settings, idx == 1 ? "ru" : "en");
+    app_run_on_main(fragment->app, reload_ui_locale_action, NULL);
 }
 
 static void audio_changed(lv_event_t *e) {
@@ -50,7 +74,7 @@ static void audio_changed(lv_event_t *e) {
         return;
     }
     app_settings_set_audio_pref(fragment->app->settings, fragment->audio_ids[idx]);
-    show_restart_hint();
+    show_restart_hint(fragment->app);
 }
 
 static void video_changed(lv_event_t *e) {
@@ -60,7 +84,7 @@ static void video_changed(lv_event_t *e) {
         return;
     }
     app_settings_set_video_pref(fragment->app->settings, fragment->video_ids[idx]);
-    show_restart_hint();
+    show_restart_hint(fragment->app);
 }
 
 static void constructor(lv_fragment_t *self, void *arg) {
@@ -93,6 +117,7 @@ static lv_obj_t *make_select_row(lv_obj_t *parent, const char *title, lv_obj_t *
 
     lv_obj_t *dd = lv_dropdown_create(row);
     lv_obj_set_width(dd, LV_PCT(100));
+    ui_obj_add_key_nav(dd);
     *dd_out = dd;
     return row;
 }
@@ -100,6 +125,7 @@ static lv_obj_t *make_select_row(lv_obj_t *parent, const char *title, lv_obj_t *
 static void fill_module_dropdown(basic_fragment *fragment, bool audio) {
     app_settings_t *settings = fragment->app->settings;
     array_list_t *modules = &settings->modules;
+    app_t *app = fragment->app;
 
     int cap = (int) array_list_size(modules) + 1;
     char **ids = calloc((size_t) cap, sizeof(char *));
@@ -109,7 +135,8 @@ static void fill_module_dropdown(basic_fragment *fragment, bool audio) {
 
     int count = 0;
     ids[count++] = strdup("auto");
-    opt_len += (size_t) snprintf(options + opt_len, sizeof(options) - opt_len, "Авто (рекомендуется)");
+    opt_len += (size_t) snprintf(options + opt_len, sizeof(options) - opt_len,
+                                 "%s", APP_TR(app, "Auto (recommended)", "Авто (рекомендуется)"));
 
     uint16_t selected = 0;
     const char *pref = audio ? settings->audio_module_pref : settings->video_module_pref;
@@ -157,6 +184,7 @@ static void fill_module_dropdown(basic_fragment *fragment, bool audio) {
 
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     basic_fragment *fragment = (basic_fragment *) self;
+    app_t *app = fragment->app;
 
     lv_obj_t *list = lv_obj_create(container);
     lv_obj_remove_style_all(list);
@@ -170,13 +198,21 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_t *intro = lv_label_create(list);
     lv_label_set_text(intro,
-                      "Если нет звука или чёрный экран — попробуйте другой модуль.\n"
-                      "После смены полностью перезапустите приложение.");
+                      APP_TR(app,
+                             "If there is no sound or a black screen — try another module.\n"
+                             "After changing, fully restart the app.",
+                             "Если нет звука или чёрный экран — попробуйте другой модуль.\n"
+                             "После смены полностью перезапустите приложение."));
     lv_label_set_long_mode(intro, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(intro, LV_PCT(100));
 
-    make_select_row(list, "Аудиовыход", &fragment->audio_dd);
-    make_select_row(list, "Видеодекодер", &fragment->video_dd);
+    make_select_row(list, APP_TR(app, "Language", "Язык"), &fragment->lang_dd);
+    lv_dropdown_set_options(fragment->lang_dd, "English\nРусский");
+    lv_dropdown_set_selected(fragment->lang_dd, app_lang_is_ru(app) ? 1 : 0);
+    lv_obj_add_event_cb(fragment->lang_dd, lang_changed, LV_EVENT_VALUE_CHANGED, fragment);
+
+    make_select_row(list, APP_TR(app, "Audio output", "Аудиовыход"), &fragment->audio_dd);
+    make_select_row(list, APP_TR(app, "Video decoder", "Видеодекодер"), &fragment->video_dd);
     fill_module_dropdown(fragment, true);
     fill_module_dropdown(fragment, false);
 
@@ -185,7 +221,9 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     lv_obj_t *active = lv_label_create(list);
     char buf[160];
-    snprintf(buf, sizeof(buf), "Сейчас активно: аудио «%s», видео «%s»",
+    snprintf(buf, sizeof(buf),
+             APP_TR(app, "Active now: audio \"%s\", video \"%s\"",
+                    "Сейчас активно: аудио «%s», видео «%s»"),
              fragment->app->settings->audio_driver ? fragment->app->settings->audio_driver : "?",
              fragment->app->settings->video_driver ? fragment->app->settings->video_driver : "?");
     lv_label_set_text(active, buf);
@@ -194,7 +232,9 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_style_text_opa(active, LV_OPA_70, 0);
 
     lv_obj_t *nav = lv_label_create(list);
-    lv_label_set_text(nav, "Советы по лагу — в разделе «Поддержка → Советы».");
+    lv_label_set_text(nav, APP_TR(app,
+                                  "Lag tips: Support → Tips.",
+                                  "Советы по лагу — в разделе «Поддержка → Советы»."));
     lv_label_set_long_mode(nav, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(nav, LV_PCT(100));
 

@@ -5,6 +5,8 @@
 #include "lv_gridview.h"
 #include "ui/app_ui.h"
 #include "ui/session/session.h"
+#include "ui/i18n.h"
+#include "ui/common/key_nav.h"
 #include "array_list.h"
 #include "lvgl/fonts/bootstrap-icons/symbols.h"
 #include "util/random.h"
@@ -121,10 +123,12 @@ static void destructor(lv_fragment_t *self) {
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     hosts_fragment *fragment = (hosts_fragment *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    lv_win_add_title(win, "Ваши компьютеры");
+    lv_win_add_title(win, APP_TR(fragment->app, "Your computers", "Ваши компьютеры"));
     lv_obj_t *add_btn = lv_win_add_btn(win, BS_SYMBOL_WINDOW_DESKTOP, LV_DPX(44));
     lv_obj_add_event_cb(add_btn, open_add_host, LV_EVENT_CLICKED, fragment);
-    app_lv_win_add_close_btn(win, fragment->app);
+    ui_obj_add_key_nav(add_btn);
+    lv_obj_t *close_btn = app_lv_win_add_close_btn(win, fragment->app);
+    ui_obj_add_key_nav(close_btn);
 
     lv_obj_t *content = lv_win_get_content(win);
     lv_obj_set_style_pad_hor(content, 0, 0);
@@ -132,6 +136,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->grid_view = lv_gridview_create(content);
     lv_obj_set_size(fragment->grid_view, LV_PCT(100), LV_PCT(100));
     lv_obj_update_layout(fragment->grid_view);
+    ui_obj_add_key_nav(fragment->grid_view);
 
     lv_obj_set_user_data(fragment->grid_view, fragment);
     lv_obj_set_style_pad_bottom(fragment->grid_view, LV_DPX(30), 0);

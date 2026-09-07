@@ -3,8 +3,11 @@
 #include "app.h"
 #include "backend/bt_gamepad_manager.h"
 #include "ui/app_ui.h"
+#include "ui/i18n.h"
+#include "ui/common/key_nav.h"
 #include "lvgl/theme.h"
 #include "lvgl/ext/msgbox_ext.h"
+#include "lvgl/ext/lv_dir_focus.h"
 #include "array_list.h"
 
 #include <stdio.h>
@@ -82,7 +85,7 @@ static void dtor(lv_fragment_t *self) {
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     gamepads_fragment_t *fragment = (gamepads_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    lv_win_add_title(win, "Геймпады");
+    lv_win_add_title(win, APP_TR(fragment->app, "Gamepads", "Геймпады"));
     fragment->close_btn = app_lv_win_add_close_btn(win, fragment->app);
 
     lv_obj_t *content = lv_win_get_content(win);
@@ -94,10 +97,16 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     fragment->hint = lv_label_create(content);
     if (bt_gamepad_available()) {
         lv_label_set_text(fragment->hint,
-                          "Пульт/джойстик: ↑↓ выбрать, OK/A открыть меню.\n"
-                          "1) Искать  2) Sync на геймпаде  3) Подключить (дождитесь конца сопряжения).");
+                          APP_TR(fragment->app,
+                                 "Remote/stick: ↑↓ select, OK/A open menu.\n"
+                                 "1) Scan  2) Sync on gamepad  3) Connect (wait for pairing).",
+                                 "Пульт/джойстик: ↑↓ выбрать, OK/A открыть меню.\n"
+                                 "1) Искать  2) Sync на геймпаде  3) Подключить (дождитесь конца сопряжения)."));
     } else {
-        lv_label_set_text(fragment->hint, "Bluetooth-геймпады доступны только на webOS TV.");
+        lv_label_set_text(fragment->hint,
+                          APP_TR(fragment->app,
+                                 "Bluetooth gamepads are only available on webOS TV.",
+                                 "Bluetooth-геймпады доступны только на webOS TV."));
     }
     lv_label_set_long_mode(fragment->hint, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(fragment->hint, LV_PCT(100));
@@ -106,7 +115,9 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_set_width(fragment->scan_btn, LV_PCT(100));
     lv_obj_set_height(fragment->scan_btn, LV_DPX(48));
     lv_obj_t *scan_label = lv_label_create(fragment->scan_btn);
-    lv_label_set_text(scan_label, bt_gamepad_available() ? "Искать геймпады" : "Недоступно");
+    lv_label_set_text(scan_label, bt_gamepad_available()
+                                  ? APP_TR(fragment->app, "Scan for gamepads", "Искать геймпады")
+                                  : APP_TR(fragment->app, "Unavailable", "Недоступно"));
     lv_obj_center(scan_label);
     lv_obj_add_event_cb(fragment->scan_btn, scan_clicked, LV_EVENT_CLICKED, fragment);
     if (!bt_gamepad_available()) {
@@ -132,8 +143,14 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     app_ui_push_modal_group(fragment->app->ui, fragment->group);
     if (fragment->close_btn) {
         lv_group_add_obj(fragment->group, fragment->close_btn);
+        ui_obj_add_key_nav(fragment->close_btn);
     }
     lv_group_add_obj(fragment->group, fragment->scan_btn);
+    ui_obj_add_key_nav(fragment->scan_btn);
+    if (fragment->close_btn) {
+        lv_obj_set_dir_focus_obj(fragment->close_btn, LV_DIR_BOTTOM, fragment->scan_btn);
+        lv_obj_set_dir_focus_obj(fragment->scan_btn, LV_DIR_TOP, fragment->close_btn);
+    }
 
     if (bt_gamepad_available()) {
         bt_gamepad_refresh_devices(&fragment->devices);
@@ -175,15 +192,26 @@ static void rebuild_list(gamepads_fragment_t *fragment) {
         lv_group_remove_all_objs(fragment->group);
         if (fragment->close_btn) {
             lv_group_add_obj(fragment->group, fragment->close_btn);
+            ui_obj_add_key_nav(fragment->close_btn);
         }
         lv_group_add_obj(fragment->group, fragment->scan_btn);
+        ui_obj_add_key_nav(fragment->scan_btn);
+        if (fragment->close_btn) {
+            lv_obj_set_dir_focus_obj(fragment->close_btn, LV_DIR_BOTTOM, fragment->scan_btn);
+            lv_obj_set_dir_focus_obj(fragment->scan_btn, LV_DIR_TOP, fragment->close_btn);
+        }
     }
 
+    lv_obj_t *prev = fragment->scan_btn;
     for (int i = 0, n = (int) array_list_size(&fragment->devices); i < n; i++) {
         bt_gamepad_device_t *d = array_list_get(&fragment->devices, i);
-        const char *status = d->connected_hid ? "HID подключён"
-                                              : (d->paired ? "сопряжён" : "найден");
-        const char *kind = d->likely_gamepad ? "геймпад?" : "другое BT";
+        const char *status = d->connected_hid
+                             ? APP_TR(fragment->app, "HID connected", "HID подключён")
+                             : (d->paired ? APP_TR(fragment->app, "paired", "сопряжён")
+                                          : APP_TR(fragment->app, "found", "найден"));
+        const char *kind = d->likely_gamepad
+                           ? APP_TR(fragment->app, "gamepad?", "геймпад?")
+                           : APP_TR(fragment->app, "other BT", "другое BT");
         char line[192];
         snprintf(line, sizeof(line), "%s\n%s · %s · %s", d->name, d->address, status, kind);
 
@@ -208,14 +236,21 @@ static void rebuild_list(gamepads_fragment_t *fragment) {
         lv_obj_add_event_cb(btn, device_btn_deleted, LV_EVENT_DELETE, NULL);
         if (fragment->group) {
             lv_group_add_obj(fragment->group, btn);
+            ui_obj_add_key_nav(btn);
+            lv_obj_set_dir_focus_obj(prev, LV_DIR_BOTTOM, btn);
+            lv_obj_set_dir_focus_obj(btn, LV_DIR_TOP, prev);
+            prev = btn;
         }
     }
 
     if (array_list_size(&fragment->devices) == 0) {
         lv_list_add_text(fragment->list,
                          fragment->scanning
-                         ? "Поиск геймпадов… (анонимный BLE скрыт)"
-                         : "Подходящих устройств нет. Запустите поиск и sync на джойстике.");
+                         ? APP_TR(fragment->app, "Scanning… (anonymous BLE is hidden)",
+                                  "Поиск геймпадов… (анонимный BLE скрыт)")
+                         : APP_TR(fragment->app,
+                                  "No matching devices. Start scan and press sync on the controller.",
+                                  "Подходящих устройств нет. Запустите поиск и sync на джойстике."));
     }
     if (fragment->group && fragment->scan_btn) {
         lv_group_focus_obj(fragment->scan_btn);
@@ -229,26 +264,35 @@ static void device_btn_deleted(lv_event_t *e) {
 static void scan_clicked(lv_event_t *e) {
     gamepads_fragment_t *fragment = lv_event_get_user_data(e);
     if (!bt_gamepad_available()) {
-        show_msg("Bluetooth доступен только на webOS TV");
+        show_msg(APP_TR(fragment->app, "Bluetooth is only available on webOS TV",
+                        "Bluetooth доступен только на webOS TV"));
         return;
     }
     if (!fragment->scanning) {
         if (!bt_gamepad_start_scan()) {
-            show_msg("Не удалось начать поиск Bluetooth");
+            show_msg(APP_TR(fragment->app, "Failed to start Bluetooth scan",
+                            "Не удалось начать поиск Bluetooth"));
             return;
         }
         fragment->scanning = true;
-        lv_label_set_text(lv_obj_get_child(fragment->scan_btn, 0), "Остановить поиск");
-        lv_label_set_text(fragment->hint, "Поиск… Нажмите sync на джойстике. Листайте список ↓↑.");
+        lv_label_set_text(lv_obj_get_child(fragment->scan_btn, 0),
+                          APP_TR(fragment->app, "Stop scan", "Остановить поиск"));
+        lv_label_set_text(fragment->hint,
+                          APP_TR(fragment->app,
+                                 "Scanning… Press sync on the controller. Scroll the list with ↓↑.",
+                                 "Поиск… Нажмите sync на джойстике. Листайте список ↓↑."));
         if (fragment->scan_timer == NULL) {
             fragment->scan_timer = lv_timer_create(scan_timer_cb, 1500, fragment);
         }
     } else {
         bt_gamepad_stop_scan();
         fragment->scanning = false;
-        lv_label_set_text(lv_obj_get_child(fragment->scan_btn, 0), "Искать геймпады");
+        lv_label_set_text(lv_obj_get_child(fragment->scan_btn, 0),
+                          APP_TR(fragment->app, "Scan for gamepads", "Искать геймпады"));
         lv_label_set_text(fragment->hint,
-                          "Искать → sync на джойстике → выбрать → Подключить / Отключить / Забыть.");
+                          APP_TR(fragment->app,
+                                 "Scan → sync on controller → select → Connect / Disconnect / Forget.",
+                                 "Искать → sync на джойстике → выбрать → Подключить / Отключить / Забыть."));
         if (fragment->scan_timer != NULL) {
             lv_timer_del(fragment->scan_timer);
             fragment->scan_timer = NULL;

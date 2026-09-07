@@ -23,6 +23,8 @@
 #include "ui/connection/connection_fragment.h"
 #include "backend/input_manager.h"
 #include "assets/hydra_icon.h"
+#include "ui/i18n.h"
+#include "ui/common/key_nav.h"
 
 typedef struct launcher_fragment {
     lv_fragment_t base;
@@ -231,7 +233,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_t *brand_sub = lv_label_create(header);
     lv_obj_add_style(brand_sub, &fragment->styles.subtitle, 0);
     lv_obj_set_style_pad_left(brand_sub, LV_DPX(8), 0);
-    lv_label_set_text(brand_sub, "Удалённая игра");
+    lv_label_set_text(brand_sub, APP_TR(fragment->app, "Remote Play", "Удалённая игра"));
 
     lv_obj_t *spacer = lv_obj_create(header);
     lv_obj_remove_style_all(spacer);
@@ -306,10 +308,10 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_t *label_steam = lv_label_create(btn_steam);
     lv_obj_set_style_text_font(label_steam, fragment->app->ui->font.heading3, 0);
     lv_obj_set_style_text_color(label_steam, lv_color_white(), 0);
-    lv_label_set_text(label_steam, "Запустить в Steam");
+    lv_label_set_text(label_steam, APP_TR(fragment->app, "Launch in Steam", "Запустить в Steam"));
     lv_obj_t *label_steam_sub = lv_label_create(btn_steam);
     lv_obj_set_style_text_color(label_steam_sub, lv_color_hex(0xd2e885), 0);
-    lv_label_set_text(label_steam_sub, "Big Picture · Steam Link");
+    lv_label_set_text(label_steam_sub, APP_TR(fragment->app, "Big Picture · Steam Link", "Big Picture · Steam Link"));
     lv_obj_add_event_cb(btn_steam, request_session, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(btn_steam, play_btn_key, LV_EVENT_KEY, NULL);
 
@@ -333,29 +335,38 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     lv_obj_t *label_hydra = lv_label_create(btn_hydra);
     lv_obj_set_style_text_font(label_hydra, fragment->app->ui->font.heading3, 0);
     lv_obj_set_style_text_color(label_hydra, lv_color_white(), 0);
-    lv_label_set_text(label_hydra, "Запустить в Hydra");
+    lv_label_set_text(label_hydra, APP_TR(fragment->app, "Launch in Hydra", "Запустить в Hydra"));
     lv_obj_t *label_hydra_sub = lv_label_create(btn_hydra);
     lv_obj_set_style_text_color(label_hydra_sub, lv_color_hex(0x66c0f4), 0);
-    lv_label_set_text(label_hydra_sub, "Рабочий стол · Steam Link");
+    lv_label_set_text(label_hydra_sub, APP_TR(fragment->app, "Desktop · Steam Link", "Рабочий стол · Steam Link"));
     lv_obj_add_event_cb(btn_hydra, request_session, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(btn_hydra, play_btn_key, LV_EVENT_KEY, NULL);
 
     lv_obj_t *selected_host = launch_option_create_label_action(fragment, BS_SYMBOL_DISPLAY, NULL);
     fragment->selected_host = selected_host;
-
     lv_obj_add_event_cb(selected_host, select_host, LV_EVENT_CLICKED, fragment);
+    ui_obj_add_key_nav(selected_host);
 
-    lv_obj_t *wake_host = launch_option_create_label_action(fragment, BS_SYMBOL_POWER, "Разбудить ПК");
+    lv_obj_t *wake_host = launch_option_create_label_action(fragment, BS_SYMBOL_POWER,
+                                                             APP_TR(fragment->app, "Wake PC", "Разбудить ПК"));
     fragment->wake_host = wake_host;
     lv_obj_add_event_cb(wake_host, wake_host_clicked, LV_EVENT_CLICKED, fragment);
+    ui_obj_add_key_nav(wake_host);
 
-    lv_obj_t *add_host = launch_option_create_label_action(fragment, BS_SYMBOL_WINDOW_DESKTOP, "Добавить компьютер…");
+    lv_obj_t *add_host = launch_option_create_label_action(fragment, BS_SYMBOL_WINDOW_DESKTOP,
+                                                           APP_TR(fragment->app, "Add computer…", "Добавить компьютер…"));
     fragment->add_host = add_host;
     lv_obj_add_event_cb(add_host, add_host_clicked, LV_EVENT_CLICKED, fragment);
+    ui_obj_add_key_nav(add_host);
 
     lv_obj_t *gamepads = launch_option_create_label_action(fragment, BS_SYMBOL_CONTROLLER, NULL);
     fragment->gamepads = gamepads;
     lv_obj_add_event_cb(gamepads, gamepads_clicked, LV_EVENT_CLICKED, fragment);
+    ui_obj_add_key_nav(gamepads);
+
+    ui_obj_add_key_nav(btn_settings);
+    ui_obj_add_key_nav(btn_support);
+    ui_obj_add_key_nav(btn_quit);
 
     lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_RIGHT, btn_support);
     lv_obj_set_dir_focus_obj(btn_settings, LV_DIR_BOTTOM, btn_steam);
@@ -431,11 +442,11 @@ static void launcher_gamepads_changed(launcher_fragment *fragment) {
     size_t count = input_manager_sdl_gamepad_count(manager);
     lv_obj_t *label = launch_option_get_label(fragment->gamepads);
     if (count == 0) {
-        lv_label_set_text(label, "Геймпад не подключён");
+        lv_label_set_text(label, APP_TR(fragment->app, "No gamepad connected", "Геймпад не подключён"));
     } else if (count == 1) {
-        lv_label_set_text(label, "Подключён 1 геймпад");
+        lv_label_set_text(label, APP_TR(fragment->app, "1 gamepad connected", "Подключён 1 геймпад"));
     } else {
-        lv_label_set_text_fmt(label, "Геймпадов: %u", (unsigned) count);
+        lv_label_set_text_fmt(label, APP_TR(fragment->app, "Gamepads: %u", "Геймпадов: %u"), (unsigned) count);
     }
 }
 
@@ -530,9 +541,10 @@ static void wake_host_clicked(lv_event_t *e) {
     }
     host_manager_t *manager = fragment->app->host_manager;
     if (host_manager_wake(manager, fragment->selected_host_id)) {
-        launch_option_set_text(fragment->wake_host, "Сигнал отправлен…");
+        launch_option_set_text(fragment->wake_host, APP_TR(fragment->app, "Signal sent…", "Сигнал отправлен…"));
     } else {
-        launch_option_set_text(fragment->wake_host, "Нет MAC — сначала найдите ПК");
+        launch_option_set_text(fragment->wake_host,
+                               APP_TR(fragment->app, "No MAC — find the PC first", "Нет MAC — сначала найдите ПК"));
     }
 }
 
@@ -553,22 +565,29 @@ static void launcher_quit(lv_event_t *e) {
 }
 
 static void hosts_update(launcher_fragment *fragment) {
+    app_t *app = fragment->app;
     const IHS_HostInfo *host = get_selected_host(fragment);
     if (host != NULL) {
         host_manager_presence presence = host_manager_get_presence(fragment->app->host_manager, host->clientId);
+        const char *pl = APP_TR(app, "unknown", "неизвестно");
+        if (presence == HOST_MANAGER_PRESENCE_ONLINE) {
+            pl = APP_TR(app, "Steam ready", "Steam готов");
+        } else if (presence == HOST_MANAGER_PRESENCE_ASLEEP) {
+            pl = APP_TR(app, "asleep", "спит");
+        }
         char label[96];
-        snprintf(label, sizeof(label), "%s · %s", host->hostname, host_manager_presence_label(presence));
+        snprintf(label, sizeof(label), "%s · %s", host->hostname, pl);
         launch_option_set_text(fragment->selected_host, label);
         if (presence == HOST_MANAGER_PRESENCE_ONLINE) {
-            launch_option_set_text(fragment->wake_host, "ПК уже онлайн");
+            launch_option_set_text(fragment->wake_host, APP_TR(app, "PC already online", "ПК уже онлайн"));
         } else if (host->macAddress[0] != '\0') {
-            launch_option_set_text(fragment->wake_host, "Разбудить ПК (WoL)");
+            launch_option_set_text(fragment->wake_host, APP_TR(app, "Wake PC (WoL)", "Разбудить ПК (WoL)"));
         } else {
-            launch_option_set_text(fragment->wake_host, "WoL недоступен (нет MAC)");
+            launch_option_set_text(fragment->wake_host, APP_TR(app, "WoL unavailable (no MAC)", "WoL недоступен (нет MAC)"));
         }
     } else {
-        launch_option_set_text(fragment->selected_host, "Выберите компьютер…");
-        launch_option_set_text(fragment->wake_host, "Разбудить ПК");
+        launch_option_set_text(fragment->selected_host, APP_TR(app, "Select a computer…", "Выберите компьютер…"));
+        launch_option_set_text(fragment->wake_host, APP_TR(app, "Wake PC", "Разбудить ПК"));
     }
 }
 

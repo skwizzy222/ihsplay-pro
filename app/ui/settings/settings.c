@@ -5,6 +5,9 @@
 #include "lvgl/theme.h"
 #include "basic.h"
 #include "ui/app_ui.h"
+#include "ui/i18n.h"
+#include "ui/common/key_nav.h"
+#include "lvgl/ext/lv_dir_focus.h"
 
 typedef struct settings_fragment {
     lv_fragment_t base;
@@ -48,7 +51,7 @@ static void destructor(lv_fragment_t *self) {
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     settings_fragment *fragment = (settings_fragment *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    lv_win_add_title(win, "Настройки");
+    lv_win_add_title(win, APP_TR(fragment->app, "Settings", "Настройки"));
     fragment->close_btn = app_lv_win_add_close_btn(win, fragment->app);
     fragment->content = lv_win_get_content(win);
     return win;
@@ -65,8 +68,8 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     app_ui_push_modal_group(fragment->app->ui, fragment->group);
     if (fragment->close_btn) {
         lv_group_add_obj(fragment->group, fragment->close_btn);
+        ui_obj_add_key_nav(fragment->close_btn);
     }
-    /* Focus dropdowns inside basic content */
     lv_obj_t *first_dd = NULL;
     if (f->obj) {
         uint32_t n = lv_obj_get_child_cnt(f->obj);
@@ -83,6 +86,10 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
                 }
             }
         }
+    }
+    if (fragment->close_btn && first_dd) {
+        lv_obj_set_dir_focus_obj(fragment->close_btn, LV_DIR_BOTTOM, first_dd);
+        lv_obj_set_dir_focus_obj(first_dd, LV_DIR_TOP, fragment->close_btn);
     }
     if (first_dd) {
         lv_group_focus_obj(first_dd);

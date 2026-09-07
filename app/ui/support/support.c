@@ -5,12 +5,16 @@
 #include "app.h"
 #include "lvgl/theme.h"
 #include "ui/app_ui.h"
+#include "ui/i18n.h"
+#include "ui/common/key_nav.h"
+#include "lvgl/ext/lv_dir_focus.h"
 
 typedef struct support_fragment_t {
     lv_fragment_t base;
     lv_coord_t col_dsc[3], row_dsc[5];
     lv_obj_t *win_content;
     lv_obj_t *close_btn;
+    lv_obj_t *side_btns[3];
     lv_group_t *group;
     int num_btns;
     app_t *app;
@@ -60,8 +64,9 @@ static void constructor(lv_fragment_t *self, void *args) {
 
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *parent) {
     support_fragment_t *fragment = (support_fragment_t *) self;
+    app_t *app = fragment->app;
     lv_obj_t *win = app_lv_win_create(parent);
-    lv_win_add_title(win, "Поддержка");
+    lv_win_add_title(win, APP_TR(app, "Support", "Поддержка"));
     fragment->close_btn = app_lv_win_add_close_btn(win, fragment->app);
     fragment->win_content = lv_win_get_content(win);
     lv_obj_set_style_pad_row(fragment->win_content, LV_DPX(15), 0);
@@ -71,9 +76,12 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *parent) {
     lv_obj_add_event_cb(fragment->win_content, btn_click_cb, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->win_content, btn_key_cb, LV_EVENT_KEY, fragment);
 
-    add_btn(fragment, fragment->win_content, "Справка", &wiki_fragment_class);
-    add_btn(fragment, fragment->win_content, "Советы", &tips_fragment_class);
-    add_btn(fragment, fragment->win_content, "О системе", &feedback_fragment_class);
+    fragment->side_btns[0] = add_btn(fragment, fragment->win_content,
+                                     APP_TR(app, "Guide", "Справка"), &wiki_fragment_class);
+    fragment->side_btns[1] = add_btn(fragment, fragment->win_content,
+                                     APP_TR(app, "Tips", "Советы"), &tips_fragment_class);
+    fragment->side_btns[2] = add_btn(fragment, fragment->win_content,
+                                     APP_TR(app, "About", "О системе"), &feedback_fragment_class);
 
     return win;
 }
@@ -86,24 +94,22 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
     app_ui_push_modal_group(fragment->app->ui, fragment->group);
     if (fragment->close_btn) {
         lv_group_add_obj(fragment->group, fragment->close_btn);
+        ui_obj_add_key_nav(fragment->close_btn);
     }
-    /* Buttons are children of win_content */
-    uint32_t n = lv_obj_get_child_cnt(fragment->win_content);
-    for (uint32_t i = 0; i < n; i++) {
-        lv_obj_t *ch = lv_obj_get_child(fragment->win_content, i);
-        if (lv_obj_check_type(ch, &lv_btn_class)) {
-            lv_group_add_obj(fragment->group, ch);
+    for (int i = 0; i < fragment->num_btns; i++) {
+        lv_group_add_obj(fragment->group, fragment->side_btns[i]);
+        ui_obj_add_key_nav(fragment->side_btns[i]);
+    }
+    if (fragment->close_btn && fragment->num_btns > 0) {
+        lv_obj_set_dir_focus_obj(fragment->close_btn, LV_DIR_BOTTOM, fragment->side_btns[0]);
+        lv_obj_set_dir_focus_obj(fragment->side_btns[0], LV_DIR_TOP, fragment->close_btn);
+        for (int i = 0; i < fragment->num_btns - 1; i++) {
+            lv_obj_set_dir_focus_obj(fragment->side_btns[i], LV_DIR_BOTTOM, fragment->side_btns[i + 1]);
+            lv_obj_set_dir_focus_obj(fragment->side_btns[i + 1], LV_DIR_TOP, fragment->side_btns[i]);
         }
     }
     if (fragment->num_btns > 0) {
-        /* Focus first sidebar button (after close may be last in header) */
-        for (uint32_t i = 0; i < n; i++) {
-            lv_obj_t *ch = lv_obj_get_child(fragment->win_content, i);
-            if (lv_obj_check_type(ch, &lv_btn_class)) {
-                lv_group_focus_obj(ch);
-                break;
-            }
-        }
+        lv_group_focus_obj(fragment->side_btns[0]);
     }
     show_page(self, &wiki_fragment_class);
 }
@@ -166,29 +172,12 @@ static void btn_key_cb(lv_event_t *e) {
     if (!lv_obj_check_type(target, &lv_btn_class)) {
         return;
     }
-    lv_fragment_t *self = lv_event_get_user_data(e);
-    lv_coord_t pos = lv_obj_get_style_grid_cell_row_pos(target, 0);
-    lv_group_t *group = lv_obj_get_group(target);
-    switch (lv_event_get_key(e)) {
-        case LV_KEY_UP: {
-            if (pos > 0) {
-                lv_group_focus_prev(group);
-            }
-            break;
+    if (lv_event_get_key(e) == LV_KEY_ENTER) {
+        const lv_fragment_class_t *cls = lv_obj_get_user_data(target);
+        if (cls) {
+            show_page(lv_event_get_user_data(e), cls);
         }
-        case LV_KEY_DOWN: {
-            support_fragment_t *fragment = (support_fragment_t *) self;
-            if (pos < fragment->num_btns - 1) {
-                lv_group_focus_next(group);
-            }
-            break;
-        }
-        case LV_KEY_ENTER: {
-            const lv_fragment_class_t *cls = lv_obj_get_user_data(target);
-            if (cls) {
-                show_page(self, cls);
-            }
-            break;
-        }
+        return;
     }
+    ui_key_nav_cb(e);
 }

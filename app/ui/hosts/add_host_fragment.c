@@ -3,6 +3,7 @@
 #include "app.h"
 #include "backend/host_manager.h"
 #include "ui/app_ui.h"
+#include "ui/i18n.h"
 #include "lvgl/theme.h"
 #include "lvgl/ext/lv_dir_focus.h"
 
@@ -88,14 +89,16 @@ static void dtor(lv_fragment_t *self) {
 static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
     add_host_fragment_t *fragment = (add_host_fragment_t *) self;
     lv_obj_t *win = app_lv_win_create(container);
-    lv_win_add_title(win, "Add Computer by IP");
+    lv_win_add_title(win, APP_TR(fragment->app, "Add Computer by IP", "Добавить компьютер по IP"));
     lv_obj_t *content = lv_win_get_content(win);
     lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(content, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_gap(content, LV_DPX(14), 0);
 
     lv_obj_t *hint = lv_label_create(content);
-    lv_label_set_text(hint, "Введите локальный IP компьютера со Steam");
+    lv_label_set_text(hint, APP_TR(fragment->app,
+                                   "Enter the local IP of the PC with Steam",
+                                   "Введите локальный IP компьютера со Steam"));
     lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
 
     fragment->ip_label = lv_label_create(content);
@@ -134,7 +137,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->delete_btn = lv_btn_create(actions);
     lv_obj_t *backspace_label = lv_label_create(fragment->delete_btn);
-    lv_label_set_text(backspace_label, "Стереть");
+    lv_label_set_text(backspace_label, APP_TR(fragment->app, "Delete", "Стереть"));
     lv_obj_center(backspace_label);
     lv_obj_add_event_cb(fragment->delete_btn, backspace_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->delete_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -142,7 +145,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->find_btn = lv_btn_create(actions);
     lv_obj_t *connect_label = lv_label_create(fragment->find_btn);
-    lv_label_set_text(connect_label, "Найти ПК");
+    lv_label_set_text(connect_label, APP_TR(fragment->app, "Find PC", "Найти ПК"));
     lv_obj_center(connect_label);
     lv_obj_add_event_cb(fragment->find_btn, connect_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->find_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -150,7 +153,7 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *container) {
 
     fragment->back_btn = lv_btn_create(actions);
     lv_obj_t *back_label = lv_label_create(fragment->back_btn);
-    lv_label_set_text(back_label, "Закрыть");
+    lv_label_set_text(back_label, APP_TR(fragment->app, "Close", "Закрыть"));
     lv_obj_center(back_label);
     lv_obj_add_event_cb(fragment->back_btn, nav_back_clicked, LV_EVENT_CLICKED, fragment);
     lv_obj_add_event_cb(fragment->back_btn, keypad_key, LV_EVENT_KEY, NULL);
@@ -279,10 +282,11 @@ static void backspace_clicked(lv_event_t *e) {
 static void connect_clicked(lv_event_t *e) {
     add_host_fragment_t *fragment = lv_event_get_user_data(e);
     if (!host_manager_discover_at(fragment->app->host_manager, fragment->ip)) {
-        lv_label_set_text(fragment->status_label, "Неверный IP-адрес");
+        lv_label_set_text(fragment->status_label, APP_TR(fragment->app, "Invalid IP address", "Неверный IP-адрес"));
         return;
     }
-    lv_label_set_text(fragment->status_label, "Ищем компьютер со Steam…");
+    lv_label_set_text(fragment->status_label,
+                      APP_TR(fragment->app, "Looking for a Steam PC…", "Ищем компьютер со Steam…"));
     app_ui_pop_top_fragment(fragment->app->ui);
 }
 

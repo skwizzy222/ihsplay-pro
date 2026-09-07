@@ -39,6 +39,12 @@ static void settings_load(app_settings_t *settings) {
             snprintf(settings->audio_module_pref, sizeof(settings->audio_module_pref), "%s", value);
         } else if (strcmp(key, "video_module") == 0) {
             snprintf(settings->video_module_pref, sizeof(settings->video_module_pref), "%s", value);
+        } else if (strcmp(key, "language") == 0) {
+            if (strcmp(value, "ru") == 0) {
+                snprintf(settings->language, sizeof(settings->language), "ru");
+            } else {
+                snprintf(settings->language, sizeof(settings->language), "en");
+            }
         }
     }
     fclose(f);
@@ -54,6 +60,7 @@ void app_settings_save(const app_settings_t *settings) {
     }
     fprintf(f, "audio_module=%s\n", settings->audio_module_pref[0] ? settings->audio_module_pref : "auto");
     fprintf(f, "video_module=%s\n", settings->video_module_pref[0] ? settings->video_module_pref : "auto");
+    fprintf(f, "language=%s\n", settings->language[0] ? settings->language : "en");
     fclose(f);
 }
 
@@ -78,6 +85,7 @@ void app_settings_init(app_settings_t *settings, const os_info_t *os_info) {
     memset(settings, 0, sizeof(app_settings_t));
     snprintf(settings->audio_module_pref, sizeof(settings->audio_module_pref), "%s", MODULE_PREFERENCE_AUTO);
     snprintf(settings->video_module_pref, sizeof(settings->video_module_pref), "%s", MODULE_PREFERENCE_AUTO);
+    snprintf(settings->language, sizeof(settings->language), "en");
     settings_load(settings);
 
     int err;
@@ -112,6 +120,19 @@ bool app_settings_set_video_pref(app_settings_t *settings, const char *module_id
     }
     snprintf(settings->video_module_pref, sizeof(settings->video_module_pref), "%s", module_id_or_auto);
     settings_apply_selection(settings);
+    app_settings_save(settings);
+    return true;
+}
+
+bool app_settings_set_language(app_settings_t *settings, const char *lang_en_or_ru) {
+    if (settings == NULL || lang_en_or_ru == NULL) {
+        return false;
+    }
+    if (strcmp(lang_en_or_ru, "ru") == 0) {
+        snprintf(settings->language, sizeof(settings->language), "ru");
+    } else {
+        snprintf(settings->language, sizeof(settings->language), "en");
+    }
     app_settings_save(settings);
     return true;
 }
