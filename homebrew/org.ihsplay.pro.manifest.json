@@ -2,13 +2,13 @@
   "id": "org.ihsplay.pro",
   "version": "0.3.0",
   "type": "native",
-  "title": "Steam Remote Play",
-  "appDescription": "Steam Remote Play client for webOS (IHSplay Pro)",
-  "iconUri": "https://cdn.jsdelivr.net/gh/skwizzy222/ihsplay-pro@main/deploy/webos/icon.png",
+  "title": "IHSplay Pro",
+  "appDescription": "Improved IHSplay fork - Steam Remote Play client for LG webOS",
+  "iconUri": "https://raw.githubusercontent.com/skwizzy222/ihsplay-pro/main/deploy/webos/icon.png",
   "sourceUrl": "https://github.com/skwizzy222/ihsplay-pro",
   "rootRequired": false,
-  "ipkUrl": "https://cdn.jsdelivr.net/gh/skwizzy222/ihsplay-pro@main/homebrew/org.ihsplay.pro_0.3.0_arm.ipk",
+  "ipkUrl": "https://github.com/skwizzy222/ihsplay-pro/releases/latest/download/org.ihsplay.pro_0.3.0_arm.ipk",
   "ipkHash": {
-    "sha256": "88a999e0602b7712af7598589dcd99ee2abf6150509a569ce817a3470a75d489"
+    "sha256": "97d68807392f03d722c1f4a7aa788b10315c412a883a7198c013c7254eb05319"
   }
 }
