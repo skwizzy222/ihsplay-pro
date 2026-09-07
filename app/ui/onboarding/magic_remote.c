@@ -18,6 +18,7 @@ typedef struct magic_remote_onboarding_fragment_t {
     lv_obj_t *btn_skip;
     lv_obj_t *btn_next;
     int step;
+    bool closing;
 } magic_remote_onboarding_fragment_t;
 
 enum {
@@ -58,6 +59,7 @@ static void constructor(lv_fragment_t *self, void *args) {
     magic_remote_onboarding_fragment_t *fragment = (magic_remote_onboarding_fragment_t *) self;
     fragment->app = ((app_ui_fragment_args_t *) args)->app;
     fragment->step = 0;
+    fragment->closing = false;
 }
 
 static void destructor(lv_fragment_t *self) {
@@ -226,9 +228,23 @@ static void refresh_step(magic_remote_onboarding_fragment_t *fragment) {
     }
 }
 
+static void finish_onboarding_action(app_t *app, void *data) {
+    (void) data;
+    /* Pop only if onboarding is still on top (avoids double-pop races). */
+    if (lv_fragment_manager_get_stack_size(app->ui->fm) < 2) {
+        return;
+    }
+    app_ui_pop_top_fragment(app->ui);
+}
+
 static void finish_onboarding(magic_remote_onboarding_fragment_t *fragment) {
+    if (fragment->closing) {
+        return;
+    }
+    fragment->closing = true;
     app_settings_set_magic_remote_onboarding_done(fragment->app->settings, true);
-    app_ui_pop_top_fragment(fragment->app->ui);
+    /* Never destroy the fragment from inside LV_EVENT_CLICKED — defer pop. */
+    app_run_on_main(fragment->app, finish_onboarding_action, NULL);
 }
 
 static void skip_clicked(lv_event_t *e) {
@@ -237,6 +253,9 @@ static void skip_clicked(lv_event_t *e) {
 
 static void next_clicked(lv_event_t *e) {
     magic_remote_onboarding_fragment_t *fragment = lv_event_get_user_data(e);
+    if (fragment->closing) {
+        return;
+    }
     if (fragment->step >= ONBOARD_STEPS - 1) {
         finish_onboarding(fragment);
         return;
