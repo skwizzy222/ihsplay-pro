@@ -24,6 +24,7 @@ This is a **separate app** from upstream IHSplay (`org.mariotaku.ihsplay`).
 - Video keyframe recovery fix
 - Safer gamepad hotplug
 - Persistent device identity
+- Magic Remote onboarding (stream overlay / BACK / disconnect)
 
 ## Build webOS IPK (WSL)
 

@@ -12,6 +12,7 @@
 #include "gamepads/gamepads_fragment.h"
 #include "settings/settings.h"
 #include "support/support.h"
+#include "onboarding/magic_remote.h"
 
 #include "lvgl/fonts/bootstrap-icons/symbols.h"
 
@@ -411,6 +412,10 @@ static void obj_created(lv_fragment_t *self, lv_obj_t *obj) {
 
     hosts_update(fragment);
     launcher_gamepads_changed(fragment);
+
+    if (!fragment->app->settings->magic_remote_onboarding_done) {
+        app_ui_push_fragment(fragment->app->ui, &magic_remote_onboarding_fragment_class, NULL);
+    }
 }
 
 static void obj_will_delete(lv_fragment_t *self, lv_obj_t *obj) {

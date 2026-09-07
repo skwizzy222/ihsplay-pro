@@ -8,7 +8,8 @@ target_sources(ihsplay PRIVATE
         gamepads/gamepads_fragment.c
         settings/settings.c
         settings/basic.c
-        settings/widgets.c)
+        settings/widgets.c
+        onboarding/magic_remote.c)
 
 add_subdirectory(common)
 add_subdirectory(connection)

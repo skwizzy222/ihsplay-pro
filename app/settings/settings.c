@@ -45,6 +45,9 @@ static void settings_load(app_settings_t *settings) {
             } else {
                 snprintf(settings->language, sizeof(settings->language), "en");
             }
+        } else if (strcmp(key, "magic_remote_onboarding") == 0) {
+            settings->magic_remote_onboarding_done = (strcmp(value, "1") == 0 ||
+                                                     strcmp(value, "true") == 0);
         }
     }
     fclose(f);
@@ -61,6 +64,7 @@ void app_settings_save(const app_settings_t *settings) {
     fprintf(f, "audio_module=%s\n", settings->audio_module_pref[0] ? settings->audio_module_pref : "auto");
     fprintf(f, "video_module=%s\n", settings->video_module_pref[0] ? settings->video_module_pref : "auto");
     fprintf(f, "language=%s\n", settings->language[0] ? settings->language : "en");
+    fprintf(f, "magic_remote_onboarding=%s\n", settings->magic_remote_onboarding_done ? "1" : "0");
     fclose(f);
 }
 
@@ -135,4 +139,12 @@ bool app_settings_set_language(app_settings_t *settings, const char *lang_en_or_
     }
     app_settings_save(settings);
     return true;
+}
+
+void app_settings_set_magic_remote_onboarding_done(app_settings_t *settings, bool done) {
+    if (settings == NULL) {
+        return;
+    }
+    settings->magic_remote_onboarding_done = done;
+    app_settings_save(settings);
 }

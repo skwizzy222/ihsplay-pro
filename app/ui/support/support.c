@@ -7,14 +7,16 @@
 #include "ui/app_ui.h"
 #include "ui/i18n.h"
 #include "ui/common/key_nav.h"
+#include "ui/onboarding/magic_remote.h"
 #include "lvgl/ext/lv_dir_focus.h"
 
 typedef struct support_fragment_t {
     lv_fragment_t base;
-    lv_coord_t col_dsc[3], row_dsc[5];
+    lv_coord_t col_dsc[3], row_dsc[6];
     lv_obj_t *win_content;
     lv_obj_t *close_btn;
-    lv_obj_t *side_btns[3];
+    lv_obj_t *side_btns[4];
+    lv_obj_t *btn_remote;
     lv_group_t *group;
     int num_btns;
     app_t *app;
@@ -39,6 +41,8 @@ static void btn_click_cb(lv_event_t *e);
 
 static void btn_key_cb(lv_event_t *e);
 
+static void remote_clicked(lv_event_t *e);
+
 const lv_fragment_class_t support_fragment_class = {
         .constructor_cb = constructor,
         .create_obj_cb = create_obj,
@@ -57,8 +61,9 @@ static void constructor(lv_fragment_t *self, void *args) {
     fragment->row_dsc[0] = LV_DPX(48);
     fragment->row_dsc[1] = LV_DPX(48);
     fragment->row_dsc[2] = LV_DPX(48);
-    fragment->row_dsc[3] = LV_GRID_FR(1);
-    fragment->row_dsc[4] = LV_GRID_TEMPLATE_LAST;
+    fragment->row_dsc[3] = LV_DPX(48);
+    fragment->row_dsc[4] = LV_GRID_FR(1);
+    fragment->row_dsc[5] = LV_GRID_TEMPLATE_LAST;
     fragment->num_btns = 0;
 }
 
@@ -82,6 +87,15 @@ static lv_obj_t *create_obj(lv_fragment_t *self, lv_obj_t *parent) {
                                      APP_TR(app, "Tips", "Советы"), &tips_fragment_class);
     fragment->side_btns[2] = add_btn(fragment, fragment->win_content,
                                      APP_TR(app, "About", "О системе"), &feedback_fragment_class);
+
+    fragment->btn_remote = lv_btn_create(fragment->win_content);
+    lv_obj_t *remote_lbl = lv_label_create(fragment->btn_remote);
+    lv_label_set_text(remote_lbl, APP_TR(app, "Remote", "Пульт"));
+    lv_obj_center(remote_lbl);
+    lv_obj_set_grid_cell(fragment->btn_remote, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH,
+                         fragment->num_btns, 1);
+    fragment->side_btns[fragment->num_btns++] = fragment->btn_remote;
+    lv_obj_add_event_cb(fragment->btn_remote, remote_clicked, LV_EVENT_CLICKED, fragment);
 
     return win;
 }
@@ -151,7 +165,7 @@ static void show_page(lv_fragment_t *self, const lv_fragment_class_t *cls) {
     support_fragment_t *fragment = (support_fragment_t *) self;
     lv_fragment_t *page = lv_fragment_create(cls, fragment->app);
     lv_fragment_manager_replace(self->child_manager, page, &fragment->win_content);
-    lv_obj_set_grid_cell(page->obj, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 4);
+    lv_obj_set_grid_cell(page->obj, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 5);
 }
 
 static void btn_click_cb(lv_event_t *e) {
@@ -159,12 +173,15 @@ static void btn_click_cb(lv_event_t *e) {
     if (!lv_obj_check_type(target, &lv_btn_class)) {
         return;
     }
+    support_fragment_t *fragment = lv_event_get_user_data(e);
+    if (target == fragment->btn_remote) {
+        return;
+    }
     const lv_fragment_class_t *cls = lv_obj_get_user_data(target);
     if (cls == NULL) {
         return;
     }
-    lv_fragment_t *self = lv_event_get_user_data(e);
-    show_page(self, cls);
+    show_page((lv_fragment_t *) fragment, cls);
 }
 
 static void btn_key_cb(lv_event_t *e) {
@@ -172,12 +189,22 @@ static void btn_key_cb(lv_event_t *e) {
     if (!lv_obj_check_type(target, &lv_btn_class)) {
         return;
     }
+    support_fragment_t *fragment = lv_event_get_user_data(e);
     if (lv_event_get_key(e) == LV_KEY_ENTER) {
+        if (target == fragment->btn_remote) {
+            app_ui_push_fragment(fragment->app->ui, &magic_remote_onboarding_fragment_class, NULL);
+            return;
+        }
         const lv_fragment_class_t *cls = lv_obj_get_user_data(target);
         if (cls) {
-            show_page(lv_event_get_user_data(e), cls);
+            show_page((lv_fragment_t *) fragment, cls);
         }
         return;
     }
     ui_key_nav_cb(e);
+}
+
+static void remote_clicked(lv_event_t *e) {
+    support_fragment_t *fragment = lv_event_get_user_data(e);
+    app_ui_push_fragment(fragment->app->ui, &magic_remote_onboarding_fragment_class, NULL);
 }

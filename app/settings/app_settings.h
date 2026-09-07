@@ -18,6 +18,8 @@ typedef struct app_settings_t {
     char video_module_pref[64];
     /** UI language: "en" (default) or "ru". */
     char language[8];
+    /** First-run Magic Remote streaming tips shown / dismissed. */
+    bool magic_remote_onboarding_done;
     array_list_t modules;
     uint64_t selected_client_id;
 } app_settings_t;
@@ -32,5 +34,7 @@ bool app_settings_set_audio_pref(app_settings_t *settings, const char *module_id
 bool app_settings_set_video_pref(app_settings_t *settings, const char *module_id_or_auto);
 
 bool app_settings_set_language(app_settings_t *settings, const char *lang_en_or_ru);
+
+void app_settings_set_magic_remote_onboarding_done(app_settings_t *settings, bool done);
 
 void app_settings_save(const app_settings_t *settings);
