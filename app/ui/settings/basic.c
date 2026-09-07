@@ -54,7 +54,11 @@ static void show_restart_hint(app_t *app) {
 static void reload_ui_locale_action(app_t *app, void *data) {
     (void) data;
     app_ui_t *ui = app->ui;
-    while (lv_fragment_manager_get_stack_size(ui->fm) > 0) {
+    /* Drop overlays (settings, etc.), then recreate launcher with new strings. */
+    while (lv_fragment_manager_get_stack_size(ui->fm) > 1) {
+        app_ui_pop_top_fragment(ui);
+    }
+    if (lv_fragment_manager_get_stack_size(ui->fm) > 0) {
         app_ui_pop_top_fragment(ui);
     }
     app_ui_push_fragment(ui, &launcher_fragment_class, NULL);

@@ -146,7 +146,11 @@ lv_group_t *app_ui_get_input_group(app_ui_t *ui) {
 
 void app_ui_update_nav_back(app_ui_t *ui) {
     size_t stack_size = lv_fragment_manager_get_stack_size(ui->fm);
-    LV_ASSERT(stack_size > 0);
+    /* Empty stack is valid briefly when recreating UI (e.g. language change). */
+    if (stack_size == 0) {
+        app_ui_set_handle_nav_back(ui, false);
+        return;
+    }
     app_ui_set_handle_nav_back(ui, stack_size > 1);
 }
 
